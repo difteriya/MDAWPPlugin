@@ -30,12 +30,18 @@ function activate_mida() {
     $table_name = $wpdb->prefix . 'mida_submissions';
     $charset_collate = $wpdb->get_charset_collate();
 
-    $sql = "CREATE TABLE IF NOT EXISTS $table_name (
+    // Drop the old table if it exists (to ensure clean structure)
+    $wpdb->query("DROP TABLE IF EXISTS $table_name");
+
+    $sql = "CREATE TABLE $table_name (
         id mediumint(9) NOT NULL AUTO_INCREMENT,
-        form_data longtext NOT NULL,
+        user_id bigint(20) NOT NULL,
+        selection_time_ms int(11) NOT NULL,
+        selection_time_display varchar(50) NOT NULL,
         submitted_at datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
-        user_ip varchar(100) DEFAULT '' NOT NULL,
-        PRIMARY KEY  (id)
+        PRIMARY KEY  (id),
+        KEY user_id (user_id),
+        KEY selection_time_ms (selection_time_ms)
     ) $charset_collate;";
 
     require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
@@ -59,6 +65,8 @@ register_deactivation_hook(__FILE__, 'deactivate_mida');
 function mida_init() {
     load_plugin_textdomain('mida', false, dirname(plugin_basename(__FILE__)) . '/languages');
     add_shortcode('mida_house_form', 'mida_house_form_shortcode');
+    add_shortcode('mida_rankings', 'mida_rankings_shortcode');
+    add_shortcode('mida_debug_db', 'mida_debug_db_shortcode');
 }
 add_action('plugins_loaded', 'mida_init');
 
@@ -87,10 +95,29 @@ function mida_house_form_shortcode($atts) {
     wp_enqueue_script('mida-script', MIDA_PLUGIN_URL . 'assets/js/script.js', array('jquery', 'mida-target-functions'), MIDA_VERSION, true);
     wp_localize_script('mida-script', 'midaAjax', array(
         'ajaxurl' => admin_url('admin-ajax.php'),
-        'nonce' => wp_create_nonce('mida_house_form_submit')
+        'nonce' => wp_create_nonce('mida_house_form_submit'),
+        'save_selection_nonce' => wp_create_nonce('mida_save_selection')
     ));
     
     ob_start();
+    
+    // Get user's last 3 selection times if logged in
+    $last_times = array();
+    if (is_user_logged_in()) {
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'mida_submissions';
+        $user_id = get_current_user_id();
+        
+        $last_times = $wpdb->get_results($wpdb->prepare(
+            "SELECT selection_time_display, submitted_at 
+            FROM {$table_name} 
+            WHERE user_id = %d 
+            ORDER BY submitted_at DESC 
+            LIMIT 3",
+            $user_id
+        ), ARRAY_A);
+    }
+    
     ?>
     <!-- EXACT HTML FROM MIDA TARGET WEBSITE -->
     <div class="cont body-content">
@@ -105,6 +132,27 @@ function mida_house_form_shortcode($atts) {
                 <div class="card mt-5 w-100 border-0 p-5 text-center">
                     <h2 class="mb-4">Mənzil Seçim Sistemi</h2>
                     <p class="mb-4">Mənzil seçim prosesini başlatmaq üçün aşağıdakı düyməyə klikləyin.</p>
+                    
+                    <?php if (!empty($last_times)): ?>
+                    <!-- Last 3 Selection Times -->
+                    <div class="mb-4" style="max-width: 400px; margin: 0 auto;">
+                        <h5 class="mb-3" style="color: #199862; font-weight: 600;">Son 3 Nəticəniz</h5>
+                        <div style="background: #f8f9fa; border-radius: 8px; padding: 15px;">
+                            <?php foreach ($last_times as $index => $time): ?>
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; <?php echo $index < 2 ? 'border-bottom: 1px solid #dee2e6;' : ''; ?>">
+                                <span style="color: #6c757d; font-size: 14px;">
+                                    <?php echo date('d.m.Y H:i', strtotime($time['submitted_at'])); ?>&nbsp
+                                -->&nbsp&nbsp&nbsp
+                                </span>
+                                <span style="font-family: monospace; font-size: 18px; font-weight: 700; color: #464646ff;">
+                                    <?php echo esc_html($time['selection_time_display']); ?>
+                                </span>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                    
                     <div class="d-flex justify-content-center">
                         <button type="button" id="start-btn" class="btn btn-success px-5 py-2">Başla</button>
                     </div>
@@ -113,6 +161,12 @@ function mida_house_form_shortcode($atts) {
             
             <!-- Main Form Container (Initially Hidden) -->
             <div id="main-form-container" style="display: none;">
+            
+            <!-- Timer Display -->
+            <div id="selection-timer" style="position: fixed; top: 20px; left: 20px; background: #fff; padding: 10px 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 1000; display: none;">
+                <div style="font-size: 14px; font-weight: 600; color: #333; margin-bottom: 5px;">Seçim müddəti</div>
+                <div id="timer-display" style="font-size: 24px; font-weight: 700; color: #199862; font-family: monospace;">00:00:000</div>
+            </div>
             
             <!-- Breadcrumb Navigation - EXACT FROM TARGET -->
             <div class="breadcrumb mt-4 mb-5 px-3">
@@ -354,7 +408,7 @@ function mida_house_form_shortcode($atts) {
                                             <h4 class="fs-14 my-3">Mərtəbə seçimi</h4>
                                             <div class="d-flex gap-3">
                                                 <select class="flex-grow-1 m-0" name="min_floor" disabled>
-                                                    <option value="">Min</option>
+                                                    <option value=""></option>
                                                     <option value="1">1</option>
                                                     <option value="2">2</option>
                                                     <option value="3">3</option>
@@ -366,7 +420,7 @@ function mida_house_form_shortcode($atts) {
                                                     <option value="9">9</option>
                                                 </select>
                                                 <select class="flex-grow-1 m-0" name="max_floor" disabled>
-                                                    <option value="">Max</option>
+                                                    <option value=""></option>
                                                     <option value="1">1</option>
                                                     <option value="2">2</option>
                                                     <option value="3">3</option>
@@ -522,3 +576,372 @@ function mida_handle_form_submission() {
 }
 add_action('wp_ajax_mida_submit_form', 'mida_handle_form_submission');
 add_action('wp_ajax_nopriv_mida_submit_form', 'mida_handle_form_submission');
+
+/**
+ * Handle apartment selection with timer data via AJAX.
+ */
+function mida_save_apartment_selection() {
+    check_ajax_referer('mida_save_selection', 'nonce');
+    
+    // Check if user is logged in
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => 'You must be logged in to select an apartment'));
+        return;
+    }
+    
+    $selection_time_ms = isset($_POST['selection_time_ms']) ? intval($_POST['selection_time_ms']) : 0;
+    $selection_time_display = isset($_POST['selection_time_display']) ? sanitize_text_field($_POST['selection_time_display']) : '';
+    
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'mida_submissions';
+    
+    $user_id = get_current_user_id();
+    
+    $result = $wpdb->insert(
+        $table_name,
+        array(
+            'user_id' => $user_id,
+            'selection_time_ms' => $selection_time_ms,
+            'selection_time_display' => $selection_time_display,
+            'submitted_at' => current_time('mysql')
+        ),
+        array('%d', '%d', '%s', '%s')
+    );
+    
+    if ($result) {
+        wp_send_json_success(array(
+            'message' => 'Selection saved successfully',
+            'submission_id' => $wpdb->insert_id
+        ));
+    } else {
+        wp_send_json_error(array('message' => 'Failed to save selection'));
+    }
+}
+add_action('wp_ajax_mida_save_selection', 'mida_save_apartment_selection');
+add_action('wp_ajax_nopriv_mida_save_selection', 'mida_save_apartment_selection');
+
+/**
+ * Get top 10 fastest selection times globally
+ */
+function mida_get_global_top_rankings() {
+    check_ajax_referer('mida_save_selection', 'nonce');
+    
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'mida_submissions';
+    
+    $results = $wpdb->get_results(
+        "SELECT s.id, s.user_id, s.selection_time_ms, s.selection_time_display, s.submitted_at, u.display_name
+        FROM {$table_name} s
+        LEFT JOIN {$wpdb->users} u ON s.user_id = u.ID
+        ORDER BY s.selection_time_ms ASC
+        LIMIT 10",
+        ARRAY_A
+    );
+    
+    wp_send_json_success(array('rankings' => $results));
+}
+add_action('wp_ajax_mida_get_global_rankings', 'mida_get_global_top_rankings');
+add_action('wp_ajax_nopriv_mida_get_global_rankings', 'mida_get_global_top_rankings');
+
+/**
+ * Get top 10 fastest selection times for current user
+ */
+function mida_get_user_top_rankings() {
+    check_ajax_referer('mida_save_selection', 'nonce');
+    
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => 'You must be logged in'));
+        return;
+    }
+    
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'mida_submissions';
+    $user_id = get_current_user_id();
+    
+    $results = $wpdb->get_results($wpdb->prepare(
+        "SELECT id, user_id, selection_time_ms, selection_time_display, submitted_at
+        FROM {$table_name}
+        WHERE user_id = %d
+        ORDER BY selection_time_ms ASC
+        LIMIT 10",
+        $user_id
+    ), ARRAY_A);
+    
+    wp_send_json_success(array('rankings' => $results));
+}
+add_action('wp_ajax_mida_get_user_rankings', 'mida_get_user_top_rankings');
+
+/**
+ * Rankings display shortcode
+ */
+function mida_rankings_shortcode($atts) {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'mida_submissions';
+    
+    // Get global top 10
+    $global_rankings = $wpdb->get_results(
+        "SELECT s.id, s.user_id, s.selection_time_ms, s.selection_time_display, s.submitted_at, u.display_name
+        FROM {$table_name} s
+        LEFT JOIN {$wpdb->users} u ON s.user_id = u.ID
+        ORDER BY s.selection_time_ms ASC
+        LIMIT 10",
+        ARRAY_A
+    );
+    
+    // Get user's personal top 10 if logged in
+    $user_rankings = array();
+    if (is_user_logged_in()) {
+        $user_id = get_current_user_id();
+        $user_rankings = $wpdb->get_results($wpdb->prepare(
+            "SELECT id, user_id, selection_time_ms, selection_time_display, submitted_at
+            FROM {$table_name}
+            WHERE user_id = %d
+            ORDER BY selection_time_ms ASC
+            LIMIT 10",
+            $user_id
+        ), ARRAY_A);
+    }
+    
+    ob_start();
+    ?>
+    <style>
+        .mida-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        .mida-tab {
+            flex: 1;
+            padding: 15px 30px;
+            background: transparent;
+            border: none;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            color: #666;
+            transition: all 0.3s ease;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+        }
+        .mida-tab:hover {
+            color: #199862;
+            background: #f8f9fa;
+        }
+        .mida-tab.active {
+            color: #199862;
+            border-bottom-color: #199862;
+            background: #fff;
+        }
+        .mida-tab-content {
+            display: none;
+            min-height: 500px;
+            animation: fadeIn 0.3s ease-in;
+        }
+        .mida-tab-content.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .mida-rankings-container table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            table-layout: fixed;
+        }
+        .mida-rankings-container th:first-child,
+        .mida-rankings-container td:first-child {
+            width: 100px;
+        }
+        .mida-rankings-container th:last-child,
+        .mida-rankings-container td:last-child {
+            width: 180px;
+        }
+    </style>
+    
+    <div class="mida-rankings-container" style="max-width: 1200px; margin: 0 auto;">
+        <h2 style="text-align: center; margin-bottom: 30px;">🏆 Reytinq Cədvəli</h2>
+        
+        <!-- Tabs Navigation -->
+        <div class="mida-tabs">
+            <button class="mida-tab active" onclick="switchTab('global')">🌍 Ümumi Top 10</button>
+            <?php if (is_user_logged_in()): ?>
+                <button class="mida-tab" onclick="switchTab('personal')">⭐ Şəxsi Top 10</button>
+            <?php endif; ?>
+        </div>
+        
+        <!-- Global Top 10 Tab -->
+        <div id="global-tab" class="mida-tab-content active">
+            <table style="width: 100%; border-collapse: collapse; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                <thead>
+                    <tr style="background: #199862; color: white;">
+                        <th style="padding: 15px; text-align: center; width: 100px;">Sıra</th>
+                        <th style="padding: 15px; text-align: left;">İstifadəçi</th>
+                        <th style="padding: 15px; text-align: center;">Vaxt</th>
+                        <th style="padding: 15px; text-align: center;">Tarix</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php 
+                    if (!empty($global_rankings)) {
+                        $rank = 1;
+                        foreach ($global_rankings as $record) {
+                            $medal = '';
+                            if ($rank == 1) $medal = '🥇';
+                            elseif ($rank == 2) $medal = '🥈';
+                            elseif ($rank == 3) $medal = '🥉';
+                            
+                            $bg_color = ($rank % 2 == 0) ? '#f9f9f9' : '#ffffff';
+                            ?>
+                            <tr style="background: <?php echo $bg_color; ?>; border-bottom: 1px solid #ddd;">
+                                <td style="padding: 15px; text-align: center; font-weight: bold;">
+                                    <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                                        <?php if ($medal): ?>
+                                            <span style="font-size: 24px;"><?php echo $medal; ?></span>
+                                        <?php endif; ?>
+                                        <span><?php echo $rank; ?></span>
+                                    </div>
+                                </td>
+                                <td style="padding: 15px;"><?php echo esc_html($record['display_name']); ?></td>
+                                <td style="padding: 15px; text-align: center; font-family: monospace; font-weight: bold; color: #199862;"><?php echo esc_html($record['selection_time_display']); ?></td>
+                                <td style="padding: 15px; text-align: center;"><?php echo date('d.m.Y H:i', strtotime($record['submitted_at'])); ?></td>
+                            </tr>
+                            <?php
+                            $rank++;
+                        }
+                    } else {
+                        ?>
+                        <tr>
+                            <td colspan="4" style="padding: 30px; text-align: center; color: #999;">Hələ ki nəticə yoxdur</td>
+                        </tr>
+                        <?php
+                    }
+                    ?>
+                </tbody>
+            </table>
+        </div>
+        
+        <?php if (is_user_logged_in()): ?>
+        <!-- Personal Top 10 Tab -->
+        <div id="personal-tab" class="mida-tab-content">
+            <table style="width: 100%; border-collapse: collapse; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                <thead>
+                    <tr style="background: #28a745; color: white;">
+                        <th style="padding: 15px; text-align: center; width: 100px;">Sıra</th>
+                        <th style="padding: 15px; text-align: center;">Vaxt</th>
+                        <th style="padding: 15px; text-align: center;">Tarix</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php 
+                    if (!empty($user_rankings)) {
+                        $rank = 1;
+                        foreach ($user_rankings as $record) {
+                            $bg_color = ($rank % 2 == 0) ? '#f9f9f9' : '#ffffff';
+                            ?>
+                            <tr style="background: <?php echo $bg_color; ?>; border-bottom: 1px solid #ddd;">
+                                <td style="padding: 15px; text-align: center; font-weight: bold;"><?php echo $rank; ?></td>
+                                <td style="padding: 15px; text-align: center; font-family: monospace; font-weight: bold; color: #28a745;"><?php echo esc_html($record['selection_time_display']); ?></td>
+                                <td style="padding: 15px; text-align: center;"><?php echo date('d.m.Y H:i', strtotime($record['submitted_at'])); ?></td>
+                            </tr>
+                            <?php
+                            $rank++;
+                        }
+                    } else {
+                        ?>
+                        <tr>
+                            <td colspan="3" style="padding: 30px; text-align: center; color: #999;">Hələ ki nəticəniz yoxdur. İlk cəhdinizi edin!</td>
+                        </tr>
+                        <?php
+                    }
+                    ?>
+                </tbody>
+            </table>
+        </div>
+        <?php endif; ?>
+    </div>
+    
+    <script>
+    function switchTab(tabName) {
+        // Hide all tab contents
+        document.querySelectorAll('.mida-tab-content').forEach(function(content) {
+            content.classList.remove('active');
+        });
+        
+        // Remove active class from all tabs
+        document.querySelectorAll('.mida-tab').forEach(function(tab) {
+            tab.classList.remove('active');
+        });
+        
+        // Show selected tab content
+        document.getElementById(tabName + '-tab').classList.add('active');
+        
+        // Add active class to clicked tab
+        event.target.classList.add('active');
+    }
+    </script>
+    <?php
+    return ob_get_clean();
+}
+
+/**
+ * Debug database shortcode - shows raw database data
+ */
+function mida_debug_db_shortcode() {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'mida_submissions';
+    
+    // Check if table exists
+    $table_exists = $wpdb->get_var("SHOW TABLES LIKE '{$table_name}'");
+    
+    ob_start();
+    ?>
+    <div style="background: #f5f5f5; padding: 20px; margin: 20px 0; border: 2px solid #ddd;">
+        <h3>🔍 Database Debug Info</h3>
+        
+        <p><strong>Table Name:</strong> <?php echo esc_html($table_name); ?></p>
+        <p><strong>Table Exists:</strong> <?php echo $table_exists ? '✅ Yes' : '❌ No'; ?></p>
+        
+        <?php if ($table_exists): 
+            // Get table structure
+            $columns = $wpdb->get_results("DESCRIBE {$table_name}", ARRAY_A);
+            ?>
+            
+            <h4>Table Structure:</h4>
+            <pre style="background: white; padding: 10px; overflow-x: auto;"><?php print_r($columns); ?></pre>
+            
+            <h4>Last 10 Records:</h4>
+            <?php
+            $records = $wpdb->get_results("SELECT * FROM {$table_name} ORDER BY id DESC LIMIT 10", ARRAY_A);
+            if (!empty($records)) {
+                ?>
+                <pre style="background: white; padding: 10px; overflow-x: auto;"><?php print_r($records); ?></pre>
+                <?php
+            } else {
+                echo '<p style="color: red;">❌ No records found in table</p>';
+            }
+            
+            // Count records
+            $count = $wpdb->get_var("SELECT COUNT(*) FROM {$table_name}");
+            echo '<p><strong>Total Records:</strong> ' . $count . '</p>';
+            
+            // Check for errors
+            if ($wpdb->last_error) {
+                echo '<p style="color: red;"><strong>Database Error:</strong> ' . esc_html($wpdb->last_error) . '</p>';
+            }
+        endif;
+        ?>
+    </div>
+    <?php
+    return ob_get_clean();
+}
+

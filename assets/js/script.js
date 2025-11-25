@@ -128,10 +128,71 @@
         console.log('jQuery version:', $.fn.jquery);
         console.log('apartmentsData available:', typeof apartmentsData, apartmentsData.length);
         
+        // Timer variables
+        let timerInterval = null;
+        let timerStartTime = null;
+        let timerRunning = false;
+        
+        // Timer functions
+        function startTimer() {
+            if (timerRunning) return;
+            
+            timerStartTime = Date.now();
+            timerRunning = true;
+            $('#selection-timer').fadeIn(300);
+            
+            timerInterval = setInterval(function() {
+                const elapsed = Date.now() - timerStartTime;
+                const minutes = Math.floor(elapsed / 60000);
+                const seconds = Math.floor((elapsed % 60000) / 1000);
+                const milliseconds = elapsed % 1000;
+                
+                const display = 
+                    String(minutes).padStart(2, '0') + ':' + 
+                    String(seconds).padStart(2, '0') + ':' + 
+                    String(milliseconds).padStart(3, '0');
+                
+                $('#timer-display').text(display);
+            }, 10); // Update every 10ms for smoother milliseconds display
+        }
+        
+        function stopTimer() {
+            if (!timerRunning) return;
+            
+            timerRunning = false;
+            clearInterval(timerInterval);
+            
+            const elapsed = Date.now() - timerStartTime;
+            const minutes = Math.floor(elapsed / 60000);
+            const seconds = Math.floor((elapsed % 60000) / 1000);
+            const milliseconds = elapsed % 1000;
+            
+            const timeDisplay = String(minutes).padStart(2, '0') + ':' + 
+                               String(seconds).padStart(2, '0') + ':' + 
+                               String(milliseconds).padStart(3, '0');
+            
+            console.log('Timer stopped. Total time:', minutes + 'm ' + seconds + 's ' + milliseconds + 'ms');
+            
+            // Change timer color to indicate completion
+            $('#timer-display').css('color', '#28a745');
+            
+            // Return the timer data
+            return {
+                elapsed_ms: elapsed,
+                display: timeDisplay,
+                minutes: minutes,
+                seconds: seconds,
+                milliseconds: milliseconds
+            };
+        }
+        
         // Start button handler
         $('#start-btn').on('click', function() {
             $('#start-screen').fadeOut(300, function() {
-                $('#main-form-container').fadeIn(300);
+                $('#main-form-container').fadeIn(300, function() {
+                    // Start timer after form is visible
+                    startTimer();
+                });
             });
         });
         
@@ -383,8 +444,9 @@
                 maxFloor: maxFloor
             });
             
-            // Enable search only if building type selected AND (rooms selected OR floors selected)
-            if (buildingSelected && (hasRoomSelection || (minFloor && maxFloor))) {
+            // Enable search only if building type selected AND rooms selected
+            // Floor selection is optional
+            if (buildingSelected && hasRoomSelection) {
                 console.log('Enabling search button');
                 $('#search-apartments').prop('disabled', false);
             } else {
@@ -478,11 +540,44 @@
             
             console.log('Selected apartment:', selectedApartment);
             
-            // Store selected apartment data (you can use localStorage or pass to next step)
-            // For now, just navigate to Step 3
+            // Stop the timer and get timer data
+            const timerData = stopTimer();
             
-            // TODO: Navigate to Step 3 (Mənzil detail view)
-            alert('Mənzil seçildi: Bina ' + selectedApartment.building + ', Giriş ' + selectedApartment.entrance + ', Mərtəbə ' + selectedApartment.floor);
+            if (timerData) {
+                // Save selection with timer data to database
+                $.ajax({
+                    url: midaAjax.ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'mida_save_selection',
+                        nonce: midaAjax.save_selection_nonce,
+                        selection_time_ms: timerData.elapsed_ms,
+                        selection_time_display: timerData.display
+                    },
+                    success: function(response) {
+                        console.log('Selection saved:', response);
+                        if (response.success) {
+                            // Store submission ID for later use
+                            sessionStorage.setItem('mida_submission_id', response.data.submission_id);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error saving selection:', error);
+                    }
+                });
+            }
+            
+            // Store selected apartment data
+            sessionStorage.setItem('selected_apartment', JSON.stringify(selectedApartment));
+            sessionStorage.setItem('selection_time', JSON.stringify(timerData));
+            
+            // Show alert and refresh page after user clicks OK
+            alert('Mənzil seçildi: Bina ' + selectedApartment.building + ', Giriş ' + selectedApartment.entrance + ', Mərtəbə ' + selectedApartment.floor + '\nSeçim müddəti: ' + timerData.display);
+            
+            // Refresh page after 1 second
+            setTimeout(function() {
+                location.reload();
+            }, 1000);
         });
 
         // ==================== BREADCRUMB FUNCTIONS ====================
