@@ -1,0 +1,125 @@
+.breadcrumb {
+    display: flex;
+    justify-content: space-between;
+    position: relative;
+    margin-left: 5rem;
+    margin-right: 5rem;
+}
+
+    .breadcrumb .bc-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        flex-grow: 1;
+        min-width: 8rem;
+    }
+
+        .breadcrumb .bc-item:last-child .bc-line2 {
+            background-color: transparent;
+        }
+
+        .breadcrumb .bc-item small {
+            font-size: 0.75rem;
+            color: #858585;
+        }
+
+        .breadcrumb .bc-item.pending small {
+            font-weight: 600;
+            color: #212529;
+        }
+
+        .breadcrumb .bc-item.pending .bc-circle {
+            border: 2px solid #ffb800;
+        }
+
+        .breadcrumb .bc-item.checked small {
+            font-weight: 400;
+            color: #212529;
+        }
+
+        .breadcrumb .bc-item.checked .bc-circle {
+            border: 2px solid #199862;
+            background-color: #199862;
+        }
+
+        .breadcrumb .bc-item.checked .bc-line2 {
+            background-color: #199862;
+        }
+
+    .breadcrumb .bc-circle {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        border-radius: 100%;
+        width: 1.55rem;
+        height: 1.55rem;
+        border: 1px solid #dee2e6;
+        z-index: 2;
+        background-color: #f8f9fa;
+    }
+
+        .breadcrumb .bc-circle i,
+        .breadcrumb .bc-circle span {
+            width: 1.55rem;
+            height: 1.55rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 0.75rem;
+            color: #858585;
+        }
+
+    .breadcrumb .bc-item.pending span {
+        font-weight: 600;
+        color: #212529;
+    }
+
+    .breadcrumb .bc-circle small {
+        display: flex;
+        align-items: center;
+        font-size: 0.8rem;
+    }
+
+.bc-line {
+    background-color: #eaeef1;
+    height: 1px;
+    width: 94%;
+    margin-left: 2rem;
+    top: 25%;
+    position: absolute;
+}
+
+.bc-line2 {
+    background-color: #eaeef1;
+    height: 1px;
+    width: 100%;
+}
+
+.test {
+    justify-content: end;
+    position: relative;
+}
+
+.breadcrumb-title {
+    position: absolute;
+    top: 100%;
+    width: max-content;
+}
+
+.breadcrumb .bc-item.checked.waiting .bc-line2 {
+    background-color: var(--waiting);
+}
+
+.breadcrumb .bc-item.checked.success .bc-line2 {
+    background-color: var(--success);
+}
+
+.breadcrumb .bc-item.checked.waiting .bc-circle {
+    background-color: var(--waiting);
+    border-color: var(--waiting);
+}
+
+.breadcrumb .bc-item.checked.success .bc-circle {
+    background-color: var(--success);
+    border-color: var(--success);
+}

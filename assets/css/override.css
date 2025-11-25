@@ -1,0 +1,116 @@
+/* Force override all WordPress and theme styles */
+/* This file ensures pixel-perfect rendering by overriding WordPress defaults */
+
+/* Reset WordPress default margins and padding that might interfere */
+.mida-house-form-container * {
+    box-sizing: border-box;
+}
+
+.mida-house-form-container {
+    font-family: "Inter", sans-serif;
+    line-height: 1.5;
+    color: var(--black);
+}
+
+/* Force breadcrumb styles to override any theme breadcrumbs */
+.mida-house-form-container .breadcrumb {
+    background-color: transparent;
+    padding: 0;
+    margin-bottom: 2rem;
+    list-style: none;
+}
+
+/* Force card styles */
+.mida-house-form-container .card {
+    border: none;
+    border-radius: 0.4rem;
+    box-shadow: 0px 2px 10px 0px rgba(0, 0, 0, 0.062745098);
+    background-color: white;
+}
+
+/* Force button styles to override theme buttons */
+.mida-house-form-container .btn {
+    font-family: "Inter", sans-serif;
+    font-weight: 400;
+    line-height: 1.5;
+    text-align: center;
+    text-decoration: none;
+    vertical-align: middle;
+    cursor: pointer;
+    user-select: none;
+    border: 1px solid transparent;
+    padding: 0.4rem 0.9rem;
+    font-size: 1rem;
+    border-radius: 0.25rem;
+    transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.mida-house-form-container .btn-success {
+    color: #fff;
+    background-color: var(--success);
+    border-color: var(--success);
+}
+
+.mida-house-form-container .btn-success:hover {
+    color: #fff;
+    background-color: var(--success-hover);
+    border-color: var(--success-hover);
+}
+
+/* Force input styles */
+.mida-house-form-container input,
+.mida-house-form-container textarea,
+.mida-house-form-container select {
+    font-family: "Inter", sans-serif;
+}
+
+/* Force alert styles */
+.mida-house-form-container .alert {
+    padding: 0.7rem;
+    display: flex;
+    border-left: 0.1875rem solid;
+    border-right: none;
+    border-top: none;
+    border-bottom: none;
+    background: white;
+    margin-top: 1.25rem;
+    border-radius: 0;
+}
+
+.mida-house-form-container .alert.alert-warning {
+    border-radius: 0;
+    border-left-color: var(--warning);
+    background-color: rgba(250, 163, 9, 0.1019607843);
+}
+
+/* Override any conflicting margin/padding from WordPress */
+.mida-house-form-container p,
+.mida-house-form-container h1,
+.mida-house-form-container h2,
+.mida-house-form-container h3,
+.mida-house-form-container h4,
+.mida-house-form-container h5,
+.mida-house-form-container h6 {
+    margin-bottom: 0;
+    font-family: "Inter", sans-serif;
+}
+
+/* Ensure links don't have default WordPress styling */
+.mida-house-form-container a {
+    color: inherit;
+    text-decoration: none;
+}
+
+/* Force form control styles to override Bootstrap/theme */
+.mida-house-form-container .form-control {
+    font-family: "Inter", sans-serif;
+    border: 1px solid var(--border);
+    border-radius: 0.4rem;
+    padding: 0.45rem;
+}
+
+/* Force label styles */
+.mida-house-form-container label {
+    font-family: "Inter", sans-serif;
+    margin-bottom: 0;
+}

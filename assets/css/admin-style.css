@@ -1,0 +1,27 @@
+/**
+ * Admin Styles
+ * 
+ * @package Mida
+ */
+
+.mida-admin-container {
+    max-width: 1200px;
+    margin: 20px 0;
+}
+
+.mida-admin-header {
+    background: #fff;
+    padding: 20px;
+    border-left: 4px solid #0073aa;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+    margin-bottom: 20px;
+}
+
+.mida-admin-section {
+    background: #fff;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+}
+
+/* Add your custom admin styles here */

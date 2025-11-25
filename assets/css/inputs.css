@@ -1,0 +1,91 @@
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+input[type="number"] {
+    -moz-appearance: textfield;
+}
+
+input[type="radio"] {
+    margin: 0;
+}
+
+input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+}
+
+label {
+    display: flex!important;
+    align-items: center;
+    width: 100%;
+    user-select: none;
+    cursor: pointer;
+    line-height: 1.5;
+}
+
+input[type="radio"]:disabled + label,
+input[type="checkbox"]:disabled + label {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+input[type="radio"]:disabled,
+input[type="checkbox"]:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.form-check-label {
+    color: var(--black);
+    font-size: 1rem;
+}
+
+.radio-input,
+.checkbox-input {
+    width: 1.2rem;
+    height: 1.2rem;
+    margin-right: 0.5rem;
+    cursor: pointer;
+    padding: 8px!important;
+}
+
+select {
+    outline: none;
+    margin: 0 1rem!important;
+    padding: 0.5rem!important;
+    border-color: var(--border)!important;
+    color: var(--gray);
+    cursor: pointer;
+}
+
+select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: #f5f5f5;
+}
+
+input,
+textarea {
+    border: 1px solid var(--border);
+    outline: none;
+    color: var(--gray);
+    padding: 0.45rem;
+}
+
+.file-dropzone {
+    border: 1px dashed #0074C5;
+    color: #0174C4;
+    height: 7rem;
+    padding: 2rem 3.5rem;
+    background: #F3F8FC;
+    display: flex;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.w-select {
+    width: 9rem;
+}

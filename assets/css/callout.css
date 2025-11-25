@@ -1,0 +1,52 @@
+.callout {
+    padding: 1rem 1.25rem;
+    margin-top: 1.25rem;
+    margin-bottom: 1.25rem;
+    border: 1px solid #e9ecef;
+    border-left-width: 0.25rem;
+    border-radius: 0.25rem;
+    box-shadow: 0px 0px 6px 0px rgba(0, 0, 0, 0.0784313725);
+    background-color: #fff;
+}
+
+.callout-info {
+    border-left-color: var(--info);
+}
+
+    .callout-info .info-sign {
+        color: var(--info);
+        font-size: 1.4rem;
+    }
+
+.callout-waiting {
+    border-left-color: var(--waiting);
+}
+
+.callout-warning {
+    border-left-color: var(--warning);
+}
+
+    .callout-warning .warning-sign {
+        color: var(--warning);
+        font-size: 1.4rem;
+    }
+
+.callout-danger {
+    border-left-color: var(--danger);
+}
+
+    .callout-danger .warning-sign {
+        color: var(--danger);
+        font-size: 1.4rem;
+    }
+
+.callout-success {
+    border-left-color: var(--success);
+}
+
+.callout-danger-message {
+    font-weight: 500;
+    padding: 0.5rem 0.625rem;
+    color: var(--danger);
+    background-color: rgba(var(--danger-rgb), 0.1);
+}

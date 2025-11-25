@@ -1,0 +1,201 @@
+/**
+ * Axtarış (Search) Step Styles
+ * Styles for the parametric search page
+ *
+ * @package Mida
+ */
+
+/* List Group - Filter Options */
+.list-group {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+.list-group.empty .list-group-item {
+    border-color: red;
+}
+
+.list-group-item {
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    flex-grow: 1;
+    text-align: center;
+    border-radius: 0.625rem;
+    border: 0.125rem solid transparent;
+    box-sizing: border-box;
+    transition: background 0.3s ease;
+}
+
+.list-group-item:hover.success {
+    background: rgba(25, 152, 98, 0.1);
+}
+
+.list-group-item.active.success {
+    background: #19986233;
+    color: var(--black);
+    border: 0.125rem solid #DEE2E666;
+}
+
+.list-group-item.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.list-group-item:hover.waiting {
+    background: rgba(110, 114, 240, 0.1);
+}
+
+.list-group-item.active.waiting {
+    background: #6E72F033;
+    color: var(--black);
+    border: 0.125rem solid #6E72F066;
+}
+
+.list-group-item:not(.active) {
+    background: #DEE2E633;
+    border: 0.125rem solid #DEE2E666;
+}
+
+/* Magnifying Glass States */
+.mg-glass-cont.waiting path.mg-glass {
+    fill: var(--waiting);
+}
+
+.mg-glass-cont.waiting path.mg-glass-glare {
+    fill: #A8EBCB;
+}
+
+.mg-glass-cont.success path.mg-glass {
+    fill: var(--success);
+}
+
+.mg-glass-cont.success path.mg-glass-glare {
+    fill: #95FCCE;
+}
+
+/* Dashed Border - Empty State */
+.dashed-border {
+    border: 0.1rem dashed #6C757D;
+    border-radius: 0.125rem;
+    padding: 2.5rem;
+}
+
+.not-selected {
+    border: 0.125rem solid var(--danger);
+}
+
+/* Search Results Table */
+#search tr:nth-child(even) {
+    background-color: #F0F0F0;
+}
+
+#search tr:nth-child(odd) {
+    background-color: #DFDFDF;
+}
+
+#search tr:hover {
+    background-color: #267292;
+    color: white;
+    cursor: pointer;
+}
+
+#search thead>tr, #search thead>tr:hover {
+    background-color: #B2B2B2;
+    color: white;
+    cursor: default;
+}
+
+#search table .header-fixed {
+    position: fixed;
+    top: 40px;
+    z-index: 1020;
+    border-bottom: 1px solid #d5d5d5;
+    -webkit-border-radius: 0;
+    -moz-border-radius: 0;
+    border-radius: 0;
+    -webkit-box-shadow: inset 0 1px 0 #fff, 0 1px 5px rgba(0,0,0,.1);
+    -moz-box-shadow: inset 0 1px 0 #fff, 0 1px 5px rgba(0,0,0,.1);
+    box-shadow: inset 0 1px 0 #fff, 0 1px 5px rgba(0,0,0,.1);
+    filter: progid:DXImageTransform.Microsoft.gradient(enabled=false);
+}
+
+/* Side Filter Sticky Positioning */
+#side-filter {
+    position: sticky;
+    height: max-content;
+    top: 10px;
+}
+
+/* Table Wrapper */
+#table-wrapper {
+    min-height: 500px;
+}
+
+/* Flex Layout Utilities for Axtarış */
+.flex-nowrap {
+    flex-wrap: nowrap;
+}
+
+.col-3 {
+    flex: 0 0 25%;
+    max-width: 25%;
+}
+
+.col-9 {
+    flex: 0 0 75%;
+    max-width: 75%;
+}
+
+/* Row Gap */
+.row.gap-3 {
+    gap: 1rem;
+}
+
+.cursor {
+    cursor: pointer;
+}
+
+/* Apartment List Styles */
+#apartments-list-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+#apartments-list {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.apartment-row {
+    border-bottom: 0.0625rem solid #DEE2E6;
+    padding: 0.75rem 0;
+    transition: background-color 0.3s ease;
+    cursor: pointer;
+}
+
+.apartment-row:hover.success {
+    background-color: #d1eae0;
+}
+
+.apartment-row-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875rem;
+    font-weight: 500;
+    padding: 0.5rem;
+}
+
+/* Empty State Styling */
+.dashed-border.mg-glass-cont {
+    border: 0.125rem dashed #DEE2E6;
+    border-radius: 0.625rem;
+    padding: 2rem;
+    min-height: 200px;
+}
