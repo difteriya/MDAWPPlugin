@@ -1,34 +1,13 @@
-# Mida WordPress Plugin# Mida WordPress Plugin
+# Mida WordPress Plugin
 
-
-
-**Version:** 1.2.0  ## Description
-
-**Author:** difteriya  A custom WordPress plugin providing [describe your plugin functionality here].
-
+**Version:** 1.2.1  
+**Author:** difteriya  
 **Website:** [xudiyev.com](https://xudiyev.com)  
+**Description:** MIDA oyunu üçün lazım olan hər şey
 
-**Description:** MIDA oyunu üçün lazım olan hər şey## Installation
+## 🎯 Overview
 
-
-
-## 🎯 Overview1. Upload the `mida` folder to the `/wp-content/plugins/` directory
-
-2. Activate the plugin through the 'Plugins' menu in WordPress
-
-A comprehensive WordPress plugin for the MIDA housing selection game/competition system. This plugin provides a complete apartment selection interface with timing, user restrictions, rankings, and administrative controls.3. Configure the plugin settings under the 'Mida' menu in the WordPress admin
-
-
-
-## ✨ Features## Features
-
-
-
-### 🏠 Apartment Selection System- Feature 1
-
-- **Multi-step form** with sequential validation- Feature 2
-
-- **Timer tracking** (MM:SS:MMM format) for selection speed- Feature 3
+A comprehensive WordPress plugin for the MIDA housing selection game/competition system. This plugin provides a complete apartment selection interface with timing, user restrictions, rankings, and administrative controls.
 
 - **54 sample apartments** with filtering capabilities
 
@@ -248,6 +227,13 @@ Mida/
 ```
 
 ## 🔄 Version History
+
+### 1.2.1 (2025-11-26)
+- ✅ Added GitHub auto-update functionality
+- ✅ Added manual update check page in admin dashboard
+- ✅ Added user filtering to Warnings Log
+- ✅ Added statistics by user to Warnings Log
+- ✅ Enhanced Warnings Log UI with color coding
 
 ### 1.2.0 (2025-11-26)
 - ✅ Added admin settings for user restrictions
