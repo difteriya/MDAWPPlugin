@@ -22,6 +22,23 @@ define('MIDA_VERSION', '1.2.0');
 define('MIDA_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('MIDA_PLUGIN_URL', plugin_dir_url(__FILE__));
 
+// Include Plugin Update Checker
+require MIDA_PLUGIN_DIR . 'lib/plugin-update-checker/plugin-update-checker.php';
+use YahnisElsts\PluginUpdateChecker\v5\PucFactory;
+
+// Set up automatic updates from GitHub
+$myUpdateChecker = PucFactory::buildUpdateChecker(
+    'https://github.com/difteriya/MDAWPPlugin/',
+    __FILE__,
+    'mida'
+);
+
+// Optional: Set the branch that contains the stable release
+$myUpdateChecker->setBranch('main');
+
+// Optional: If your GitHub repo is private, specify a GitHub API token
+// $myUpdateChecker->setAuthentication('your-token-here');
+
 /**
  * The code that runs during plugin activation.
  */
