@@ -27,6 +27,7 @@ require MIDA_PLUGIN_DIR . 'lib/plugin-update-checker/plugin-update-checker.php';
 use YahnisElsts\PluginUpdateChecker\v5\PucFactory;
 
 // Set up automatic updates from GitHub
+global $myUpdateChecker;
 $myUpdateChecker = PucFactory::buildUpdateChecker(
     'https://github.com/difteriya/MDAWPPlugin/',
     __FILE__,
@@ -151,6 +152,15 @@ function mida_admin_menu() {
         'manage_options',
         'mida-warnings',
         'mida_warnings_page'
+    );
+    
+    add_submenu_page(
+        'mida-settings',
+        'Plugin Updates',
+        'Updates',
+        'manage_options',
+        'mida-updates',
+        'mida_updates_page'
     );
 }
 add_action('admin_menu', 'mida_admin_menu');
@@ -433,6 +443,94 @@ function mida_warnings_page() {
                 </tbody>
             </table>
         <?php endif; ?>
+    </div>
+    <?php
+}
+
+/**
+ * Plugin Updates page
+ */
+function mida_updates_page() {
+    global $myUpdateChecker;
+    
+    // Handle manual update check
+    if (isset($_POST['check_for_updates']) && check_admin_referer('mida_check_updates')) {
+        // Force the update checker to run
+        $myUpdateChecker->checkForUpdates();
+        $update = $myUpdateChecker->getUpdate();
+        
+        if ($update !== null) {
+            echo '<div class="notice notice-success"><p>✅ New version available: ' . esc_html($update->version) . '</p></div>';
+        } else {
+            echo '<div class="notice notice-info"><p>✅ You are running the latest version!</p></div>';
+        }
+    }
+    
+    // Get current plugin info
+    $pluginFile = plugin_basename(MIDA_PLUGIN_DIR . 'mida.php');
+    $pluginData = get_plugin_data(MIDA_PLUGIN_DIR . 'mida.php');
+    
+    // Get update info
+    $update = $myUpdateChecker->getUpdate();
+    
+    ?>
+    <div class="wrap">
+        <h1>🔄 Plugin Updates</h1>
+        
+        <div class="card" style="max-width: 800px;">
+            <h2>Current Version</h2>
+            <table class="form-table">
+                <tr>
+                    <th>Plugin Name:</th>
+                    <td><strong><?php echo esc_html($pluginData['Name']); ?></strong></td>
+                </tr>
+                <tr>
+                    <th>Current Version:</th>
+                    <td><code><?php echo esc_html(MIDA_VERSION); ?></code></td>
+                </tr>
+                <tr>
+                    <th>Author:</th>
+                    <td><?php echo esc_html($pluginData['Author']); ?></td>
+                </tr>
+                <tr>
+                    <th>GitHub Repository:</th>
+                    <td><a href="https://github.com/difteriya/MDAWPPlugin" target="_blank">difteriya/MDAWPPlugin</a></td>
+                </tr>
+            </table>
+        </div>
+        
+        <div class="card" style="max-width: 800px; margin-top: 20px;">
+            <h2>Update Status</h2>
+            
+            <?php if ($update !== null): ?>
+                <div class="notice notice-warning inline">
+                    <p><strong>🎉 New version available: <?php echo esc_html($update->version); ?></strong></p>
+                    <p>You can update to the latest version from the <a href="<?php echo admin_url('plugins.php'); ?>">Plugins page</a>.</p>
+                </div>
+            <?php else: ?>
+                <div class="notice notice-success inline">
+                    <p><strong>✅ You are running the latest version!</strong></p>
+                </div>
+            <?php endif; ?>
+            
+            <form method="post" style="margin-top: 20px;">
+                <?php wp_nonce_field('mida_check_updates'); ?>
+                <button type="submit" name="check_for_updates" class="button button-primary">
+                    🔍 Check for Updates Now
+                </button>
+                <p class="description">Manually check for updates from GitHub instead of waiting for automatic checks.</p>
+            </form>
+        </div>
+        
+        <div class="card" style="max-width: 800px; margin-top: 20px;">
+            <h2>ℹ️ Update Information</h2>
+            <ul>
+                <li><strong>Automatic checks:</strong> WordPress checks for updates every 12 hours</li>
+                <li><strong>Manual check:</strong> Click the button above to check immediately</li>
+                <li><strong>Update source:</strong> Updates are pulled directly from GitHub</li>
+                <li><strong>One-click update:</strong> Update from the Plugins page when available</li>
+            </ul>
+        </div>
     </div>
     <?php
 }
