@@ -306,8 +306,8 @@
         });
 
         // Payment method selection enables flat selection method
-        $('input[name="payment-selectionnull"]').on('change', function() {
-            const paymentSelected = $('input[name="payment-selectionnull"]:checked').length > 0;
+        $('input[name="payment-method"]').on('change', function() {
+            const paymentSelected = $('input[name="payment-method"]:checked').length > 0;
             if (paymentSelected) {
                 // Enable flat selection radio buttons
                 $('input[name="flat-selection"]').prop('disabled', false);

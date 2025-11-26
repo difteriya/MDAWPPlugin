@@ -195,8 +195,8 @@ function mida_settings_page() {
                             </select>
                         </td>
                         <td>
-                            <select name="user_restrictions[<?php echo $user_id; ?>][odenish_usulu]" style="width: 100%;">
-                                <option value="">Any</option>
+                            <select name="user_restrictions[<?php echo $user_id; ?>][odenish_usulu]" style="width: 100%;" required>
+                                <option value="">Select Payment Method</option>
                                 <option value="Nağd" <?php selected(isset($user_data['odenish_usulu']) ? $user_data['odenish_usulu'] : '', 'Nağd'); ?>>Nağd</option>
                                 <option value="İpoteka" <?php selected(isset($user_data['odenish_usulu']) ? $user_data['odenish_usulu'] : '', 'İpoteka'); ?>>İpoteka</option>
                             </select>
@@ -480,6 +480,14 @@ function mida_house_form_shortcode($atts) {
         );
     }
     
+    // Get current user's restrictions
+    $user_restrictions = array();
+    if (is_user_logged_in()) {
+        $all_restrictions = get_option('mida_user_restrictions', array());
+        $current_user_id = get_current_user_id();
+        $user_restrictions = isset($all_restrictions[$current_user_id]) ? $all_restrictions[$current_user_id] : array();
+    }
+    
     ?>
     <!-- EXACT HTML FROM MIDA TARGET WEBSITE -->
     <div class="cont body-content">
@@ -602,7 +610,7 @@ function mida_house_form_shortcode($atts) {
                                     <select autocomplete="off" class="" style="max-width: fit-content;">
                                         <option disabled="disabled" selected="selected" hidden="hidden" value="">Layihəni seçin</option>
                                         <?php foreach ($projects as $index => $project): ?>
-                                            <option value="project-<?php echo $index; ?>" <?php echo !$project['enabled'] ? 'disabled="disabled"' : ''; ?>>
+                                            <option value="<?php echo esc_attr($project['name']); ?>" <?php echo !$project['enabled'] ? 'disabled="disabled"' : ''; ?>>
                                                 <?php echo esc_html($project['name']); ?>
                                             </option>
                                         <?php endforeach; ?>
@@ -617,11 +625,12 @@ function mida_house_form_shortcode($atts) {
                                     <div class="d-flex gap-2 flex-wrap">
                                         <div class="d-flex flex-wrap gap-5">
                                             <div class="d-flex gap-3">
-                                                <input type="radio" name="payment-selectionnull" id="cash-payment-choice" autocomplete="off" class="form-check-input radio-input" value="Cash" disabled>
+                                                <input type="radio" name="payment-method" id="cash-payment-choice" autocomplete="off" class="form-check-input radio-input" value="Nağd" disabled>
                                                 <label for="cash-payment-choice">Öz vəsaiti hesabına</label>
                                             </div>
+                                            
                                             <div class="d-flex gap-3 position-relative">
-                                                <input type="radio" name="payment-selectionnull" id="loan-payment-choice" autocomplete="off" class="form-check-input radio-input" value="Loan" disabled>
+                                                <input type="radio" name="payment-method" id="loan-payment-choice" autocomplete="off" class="form-check-input radio-input" value="İpoteka" disabled>
                                                 <label for="loan-payment-choice">İpoteka krediti hesabına</label>
                                                 <div id="loan-payment-type-not-allowed" onmouseover="toggleTooltip('loan-payment-type-not-allowed', true)" onmouseout="toggleTooltip('loan-payment-type-not-allowed', false)" class="custom-tooltip-icon">
                                                     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="svg-icon-size-2">
