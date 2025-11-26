@@ -396,12 +396,37 @@ function mida_warnings_page() {
     global $wpdb;
     $warnings_table = $wpdb->prefix . 'mida_warnings';
     
-    // Get all warnings with user info
+    // Get selected user filter
+    $selected_user = isset($_GET['filter_user']) ? intval($_GET['filter_user']) : 0;
+    
+    // Get user statistics
+    $user_stats = $wpdb->get_results(
+        "SELECT w.user_id, u.display_name, u.user_email,
+        COUNT(*) as total_warnings,
+        COUNT(CASE WHEN w.warning_type = 'layihe' THEN 1 END) as layihe_warnings,
+        COUNT(CASE WHEN w.warning_type = 'odenish_usulu' THEN 1 END) as odenish_warnings,
+        COUNT(CASE WHEN w.warning_type = 'mertebe' THEN 1 END) as mertebe_warnings,
+        COUNT(CASE WHEN w.warning_type = 'otaq_sayi' THEN 1 END) as otaq_warnings
+        FROM {$warnings_table} w
+        LEFT JOIN {$wpdb->users} u ON w.user_id = u.ID
+        GROUP BY w.user_id
+        ORDER BY total_warnings DESC",
+        ARRAY_A
+    );
+    
+    // Build WHERE clause for filtering
+    $where_clause = '';
+    if ($selected_user > 0) {
+        $where_clause = $wpdb->prepare("WHERE w.user_id = %d", $selected_user);
+    }
+    
+    // Get warnings (filtered or all)
     $warnings = $wpdb->get_results(
         "SELECT w.*, u.display_name, u.user_email, s.submitted_at, s.selection_time_display
         FROM {$warnings_table} w
         LEFT JOIN {$wpdb->users} u ON w.user_id = u.ID
         LEFT JOIN {$wpdb->prefix}mida_submissions s ON w.submission_id = s.id
+        {$where_clause}
         ORDER BY w.created_at DESC
         LIMIT 100",
         ARRAY_A
@@ -409,40 +434,103 @@ function mida_warnings_page() {
     
     ?>
     <div class="wrap">
-        <h1>Mida Warnings Log</h1>
+        <h1>🚨 Mida Warnings Log</h1>
         <p>List of all warnings when users selected options different from their restrictions.</p>
         
-        <?php if (empty($warnings)): ?>
-            <p>No warnings logged yet.</p>
-        <?php else: ?>
+        <!-- Statistics Section -->
+        <?php if (!empty($user_stats)): ?>
+        <div class="card" style="max-width: 100%; margin-bottom: 20px;">
+            <h2>📊 Statistics by User</h2>
             <table class="wp-list-table widefat fixed striped">
                 <thead>
                     <tr>
-                        <th>Date</th>
-                        <th>User</th>
-                        <th>Warning Type</th>
-                        <th>Expected</th>
-                        <th>Actual</th>
-                        <th>Selection Time</th>
+                        <th style="width: 250px;">User</th>
+                        <th style="width: 100px; text-align: center;">Total Warnings</th>
+                        <th style="width: 120px; text-align: center;">Layihə</th>
+                        <th style="width: 120px; text-align: center;">Ödəniş üsulu</th>
+                        <th style="width: 120px; text-align: center;">Mərtəbə</th>
+                        <th style="width: 120px; text-align: center;">Otaq sayı</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($warnings as $warning): ?>
+                    <?php foreach ($user_stats as $stat): ?>
                     <tr>
-                        <td><?php echo esc_html(date('d.m.Y H:i', strtotime($warning['created_at']))); ?></td>
                         <td>
-                            <strong><?php echo esc_html($warning['display_name']); ?></strong><br>
-                            <small><?php echo esc_html($warning['user_email']); ?></small>
+                            <strong><?php echo esc_html($stat['display_name']); ?></strong><br>
+                            <small><?php echo esc_html($stat['user_email']); ?></small>
                         </td>
-                        <td><?php echo esc_html($warning['warning_type']); ?></td>
-                        <td><code><?php echo esc_html($warning['expected_value']); ?></code></td>
-                        <td><code><?php echo esc_html($warning['actual_value']); ?></code></td>
-                        <td><?php echo esc_html($warning['selection_time_display']); ?></td>
+                        <td style="text-align: center;">
+                            <strong style="font-size: 16px; color: #d63638;"><?php echo esc_html($stat['total_warnings']); ?></strong>
+                        </td>
+                        <td style="text-align: center;"><?php echo esc_html($stat['layihe_warnings']); ?></td>
+                        <td style="text-align: center;"><?php echo esc_html($stat['odenish_warnings']); ?></td>
+                        <td style="text-align: center;"><?php echo esc_html($stat['mertebe_warnings']); ?></td>
+                        <td style="text-align: center;"><?php echo esc_html($stat['otaq_warnings']); ?></td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
             </table>
+        </div>
         <?php endif; ?>
+        
+        <!-- Filter Section -->
+        <div class="card" style="max-width: 100%; margin-bottom: 20px;">
+            <h2>🔍 Filter Warnings</h2>
+            <form method="get" action="">
+                <input type="hidden" name="page" value="mida-warnings">
+                <select name="filter_user" id="filter_user">
+                    <option value="0">All Users</option>
+                    <?php foreach ($user_stats as $stat): ?>
+                        <option value="<?php echo esc_attr($stat['user_id']); ?>" <?php selected($selected_user, $stat['user_id']); ?>>
+                            <?php echo esc_html($stat['display_name']); ?> (<?php echo esc_html($stat['total_warnings']); ?> warnings)
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <button type="submit" class="button button-primary">Apply Filter</button>
+                <?php if ($selected_user > 0): ?>
+                    <a href="?page=mida-warnings" class="button">Clear Filter</a>
+                <?php endif; ?>
+            </form>
+        </div>
+        
+        <!-- Warnings Table -->
+        <div class="card" style="max-width: 100%;">
+            <h2>📋 Warning Details <?php if ($selected_user > 0): ?><span style="color: #2271b1;">(Filtered)</span><?php endif; ?></h2>
+            <?php if (empty($warnings)): ?>
+                <p>No warnings found.</p>
+            <?php else: ?>
+                <table class="wp-list-table widefat fixed striped">
+                    <thead>
+                        <tr>
+                            <th style="width: 150px;">Date</th>
+                            <th style="width: 200px;">User</th>
+                            <th style="width: 150px;">Warning Type</th>
+                            <th style="width: 150px;">Expected</th>
+                            <th style="width: 150px;">Actual</th>
+                            <th style="width: 120px;">Selection Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($warnings as $warning): ?>
+                        <tr>
+                            <td><?php echo esc_html(date('d.m.Y H:i', strtotime($warning['created_at']))); ?></td>
+                            <td>
+                                <strong><?php echo esc_html($warning['display_name']); ?></strong><br>
+                                <small><?php echo esc_html($warning['user_email']); ?></small>
+                            </td>
+                            <td><span style="background: #fef8e7; padding: 3px 8px; border-radius: 3px; font-weight: 600;"><?php echo esc_html($warning['warning_type']); ?></span></td>
+                            <td><code style="background: #d4edda; color: #155724; padding: 3px 6px;"><?php echo esc_html($warning['expected_value']); ?></code></td>
+                            <td><code style="background: #f8d7da; color: #721c24; padding: 3px 6px;"><?php echo esc_html($warning['actual_value']); ?></code></td>
+                            <td><?php echo esc_html($warning['selection_time_display']); ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+                <p style="margin-top: 15px; color: #666;">
+                    <em>Showing <?php echo count($warnings); ?> warning(s)<?php if ($selected_user > 0): ?> for selected user<?php endif; ?></em>
+                </p>
+            <?php endif; ?>
+        </div>
     </div>
     <?php
 }
