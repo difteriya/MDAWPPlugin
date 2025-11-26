@@ -27,25 +27,50 @@ define('MIDA_PLUGIN_URL', plugin_dir_url(__FILE__));
  */
 function activate_mida() {
     global $wpdb;
-    $table_name = $wpdb->prefix . 'mida_submissions';
     $charset_collate = $wpdb->get_charset_collate();
-
-    // Drop the old table if it exists (to ensure clean structure)
+    
+    // Submissions table
+    $table_name = $wpdb->prefix . 'mida_submissions';
     $wpdb->query("DROP TABLE IF EXISTS $table_name");
-
+    
     $sql = "CREATE TABLE $table_name (
         id mediumint(9) NOT NULL AUTO_INCREMENT,
         user_id bigint(20) NOT NULL,
         selection_time_ms int(11) NOT NULL,
         selection_time_display varchar(50) NOT NULL,
+        layihe varchar(100) DEFAULT NULL,
+        odenish_usulu varchar(100) DEFAULT NULL,
+        mertebe varchar(50) DEFAULT NULL,
+        otaq_sayi varchar(50) DEFAULT NULL,
+        has_warning tinyint(1) DEFAULT 0,
         submitted_at datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
         PRIMARY KEY  (id),
         KEY user_id (user_id),
-        KEY selection_time_ms (selection_time_ms)
+        KEY selection_time_ms (selection_time_ms),
+        KEY has_warning (has_warning)
     ) $charset_collate;";
 
     require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
     dbDelta($sql);
+    
+    // Warnings table
+    $warnings_table = $wpdb->prefix . 'mida_warnings';
+    $wpdb->query("DROP TABLE IF EXISTS $warnings_table");
+    
+    $sql_warnings = "CREATE TABLE $warnings_table (
+        id mediumint(9) NOT NULL AUTO_INCREMENT,
+        submission_id mediumint(9) NOT NULL,
+        user_id bigint(20) NOT NULL,
+        warning_type varchar(50) NOT NULL,
+        expected_value varchar(100) NOT NULL,
+        actual_value varchar(100) NOT NULL,
+        created_at datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
+        PRIMARY KEY  (id),
+        KEY submission_id (submission_id),
+        KEY user_id (user_id)
+    ) $charset_collate;";
+    
+    dbDelta($sql_warnings);
     
     flush_rewrite_rules();
 }
@@ -69,6 +94,331 @@ function mida_init() {
     add_shortcode('mida_debug_db', 'mida_debug_db_shortcode');
 }
 add_action('plugins_loaded', 'mida_init');
+
+/**
+ * Add admin menu
+ */
+function mida_admin_menu() {
+    add_menu_page(
+        'Mida Settings',
+        'Mida',
+        'manage_options',
+        'mida-settings',
+        'mida_settings_page',
+        'dashicons-list-view',
+        30
+    );
+    
+    add_submenu_page(
+        'mida-settings',
+        'User Restrictions',
+        'User Restrictions',
+        'manage_options',
+        'mida-settings',
+        'mida_settings_page'
+    );
+    
+    add_submenu_page(
+        'mida-settings',
+        'Projects (Layihələr)',
+        'Projects',
+        'manage_options',
+        'mida-projects',
+        'mida_projects_page'
+    );
+    
+    add_submenu_page(
+        'mida-settings',
+        'Warnings Log',
+        'Warnings Log',
+        'manage_options',
+        'mida-warnings',
+        'mida_warnings_page'
+    );
+}
+add_action('admin_menu', 'mida_admin_menu');
+
+/**
+ * Admin settings page - User Restrictions
+ */
+function mida_settings_page() {
+    global $wpdb;
+    
+    // Handle form submission
+    if (isset($_POST['mida_save_restrictions']) && check_admin_referer('mida_restrictions_nonce')) {
+        $user_restrictions = isset($_POST['user_restrictions']) ? $_POST['user_restrictions'] : array();
+        update_option('mida_user_restrictions', $user_restrictions);
+        echo '<div class="notice notice-success"><p>Restrictions saved successfully!</p></div>';
+    }
+    
+    // Get all users
+    $users = get_users(array('orderby' => 'display_name'));
+    $restrictions = get_option('mida_user_restrictions', array());
+    $projects = get_option('mida_projects', array());
+    
+    ?>
+    <div class="wrap">
+        <h1>Mida User Restrictions</h1>
+        <p>Set mandatory selection options for each user. If a user selects different options, their time will not be counted in rankings.</p>
+        
+        <form method="post" action="">
+            <?php wp_nonce_field('mida_restrictions_nonce'); ?>
+            
+            <table class="wp-list-table widefat fixed striped">
+                <thead>
+                    <tr>
+                        <th style="width: 200px;">User</th>
+                        <th>Layihə</th>
+                        <th>Ödəniş üsulu</th>
+                        <th>Mərtəbə seçimi</th>
+                        <th>Otaq sayı</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($users as $user): 
+                        $user_id = $user->ID;
+                        $user_data = isset($restrictions[$user_id]) ? $restrictions[$user_id] : array();
+                    ?>
+                    <tr>
+                        <td><strong><?php echo esc_html($user->display_name); ?></strong><br>
+                            <small><?php echo esc_html($user->user_email); ?></small>
+                        </td>
+                        <td>
+                            <select name="user_restrictions[<?php echo $user_id; ?>][layihe]" style="width: 100%;">
+                                <option value="">Any</option>
+                                <?php foreach ($projects as $project): ?>
+                                    <option value="<?php echo esc_attr($project['name']); ?>" 
+                                            <?php selected(isset($user_data['layihe']) ? $user_data['layihe'] : '', $project['name']); ?>>
+                                        <?php echo esc_html($project['name']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </td>
+                        <td>
+                            <select name="user_restrictions[<?php echo $user_id; ?>][odenish_usulu]" style="width: 100%;">
+                                <option value="">Any</option>
+                                <option value="Nağd" <?php selected(isset($user_data['odenish_usulu']) ? $user_data['odenish_usulu'] : '', 'Nağd'); ?>>Nağd</option>
+                                <option value="İpoteka" <?php selected(isset($user_data['odenish_usulu']) ? $user_data['odenish_usulu'] : '', 'İpoteka'); ?>>İpoteka</option>
+                            </select>
+                        </td>
+                        <td>
+                            <input type="text" name="user_restrictions[<?php echo $user_id; ?>][mertebe]" 
+                                   value="<?php echo esc_attr(isset($user_data['mertebe']) ? $user_data['mertebe'] : ''); ?>" 
+                                   placeholder="e.g., 1-5" style="width: 100%;">
+                            <small>Leave empty for any, or specify: 1-5 or 1,2,3</small>
+                        </td>
+                        <td>
+                            <input type="text" name="user_restrictions[<?php echo $user_id; ?>][otaq_sayi]" 
+                                   value="<?php echo esc_attr(isset($user_data['otaq_sayi']) ? $user_data['otaq_sayi'] : ''); ?>" 
+                                   placeholder="e.g., 2,3" style="width: 100%;">
+                            <small>Leave empty for any, or specify: 1,2,3,4,5</small>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+            
+            <p class="submit">
+                <input type="submit" name="mida_save_restrictions" class="button button-primary" value="Save Restrictions">
+            </p>
+        </form>
+    </div>
+    <?php
+}
+
+/**
+ * Admin projects page - Manage Layihələr
+ */
+function mida_projects_page() {
+    // Handle form submission - Add new project
+    if (isset($_POST['mida_add_project']) && check_admin_referer('mida_projects_nonce')) {
+        $project_name = sanitize_text_field($_POST['project_name']);
+        if (!empty($project_name)) {
+            $projects = get_option('mida_projects', array());
+            $projects[] = array(
+                'name' => $project_name,
+                'enabled' => true
+            );
+            update_option('mida_projects', $projects);
+            echo '<div class="notice notice-success"><p>Project added successfully!</p></div>';
+        }
+    }
+    
+    // Handle form submission - Update projects
+    if (isset($_POST['mida_update_projects']) && check_admin_referer('mida_projects_nonce')) {
+        $projects = isset($_POST['projects']) ? $_POST['projects'] : array();
+        $updated_projects = array();
+        
+        foreach ($projects as $index => $project) {
+            if (!empty($project['name'])) {
+                $updated_projects[] = array(
+                    'name' => sanitize_text_field($project['name']),
+                    'enabled' => isset($project['enabled']) && $project['enabled'] === '1'
+                );
+            }
+        }
+        
+        update_option('mida_projects', $updated_projects);
+        echo '<div class="notice notice-success"><p>Projects updated successfully!</p></div>';
+    }
+    
+    // Handle delete
+    if (isset($_GET['delete']) && check_admin_referer('mida_delete_project_' . $_GET['delete'])) {
+        $projects = get_option('mida_projects', array());
+        $delete_index = intval($_GET['delete']);
+        if (isset($projects[$delete_index])) {
+            unset($projects[$delete_index]);
+            $projects = array_values($projects); // Reindex array
+            update_option('mida_projects', $projects);
+            echo '<div class="notice notice-success"><p>Project deleted successfully!</p></div>';
+        }
+    }
+    
+    $projects = get_option('mida_projects', array());
+    
+    ?>
+    <div class="wrap">
+        <h1>Manage Projects (Layihələr)</h1>
+        <p>Add and manage projects that will appear in the first step of the form.</p>
+        
+        <!-- Add New Project -->
+        <div style="background: #fff; padding: 20px; margin-bottom: 20px; border: 1px solid #ccc;">
+            <h2>Add New Project</h2>
+            <form method="post" action="" style="display: flex; gap: 10px; align-items: center;">
+                <?php wp_nonce_field('mida_projects_nonce'); ?>
+                <input type="text" name="project_name" placeholder="Project name (e.g., Yeni tikili)" 
+                       style="width: 300px; padding: 8px;" required>
+                <input type="submit" name="mida_add_project" class="button button-primary" value="Add Project">
+            </form>
+        </div>
+        
+        <!-- Existing Projects -->
+        <form method="post" action="">
+            <?php wp_nonce_field('mida_projects_nonce'); ?>
+            
+            <table class="wp-list-table widefat fixed striped">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">Order</th>
+                        <th>Project Name</th>
+                        <th style="width: 100px;">Status</th>
+                        <th style="width: 100px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (empty($projects)): ?>
+                        <tr>
+                            <td colspan="4" style="text-align: center; padding: 30px; color: #999;">
+                                No projects added yet. Add your first project above.
+                            </td>
+                        </tr>
+                    <?php else: ?>
+                        <?php foreach ($projects as $index => $project): ?>
+                        <tr>
+                            <td style="text-align: center;"><?php echo $index + 1; ?></td>
+                            <td>
+                                <input type="text" name="projects[<?php echo $index; ?>][name]" 
+                                       value="<?php echo esc_attr($project['name']); ?>" 
+                                       style="width: 100%;">
+                            </td>
+                            <td>
+                                <label style="display: flex; align-items: center; gap: 5px;">
+                                    <input type="hidden" name="projects[<?php echo $index; ?>][enabled]" value="0">
+                                    <input type="checkbox" name="projects[<?php echo $index; ?>][enabled]" value="1" 
+                                           <?php checked($project['enabled'], true); ?>>
+                                    <span><?php echo $project['enabled'] ? '✅ Enabled' : '❌ Disabled'; ?></span>
+                                </label>
+                            </td>
+                            <td>
+                                <a href="<?php echo wp_nonce_url(admin_url('admin.php?page=mida-projects&delete=' . $index), 'mida_delete_project_' . $index); ?>" 
+                                   class="button button-small button-link-delete"
+                                   onclick="return confirm('Are you sure you want to delete this project?');">
+                                    Delete
+                                </a>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+            
+            <?php if (!empty($projects)): ?>
+            <p class="submit">
+                <input type="submit" name="mida_update_projects" class="button button-primary" value="Save Changes">
+            </p>
+            <?php endif; ?>
+        </form>
+        
+        <div style="margin-top: 20px; padding: 15px; background: #f0f6fc; border-left: 4px solid #0073aa;">
+            <h3>ℹ️ How it works:</h3>
+            <ul>
+                <li><strong>Enabled projects</strong> will appear as active options in Step 1</li>
+                <li><strong>Disabled projects</strong> will appear as disabled (grayed out) options</li>
+                <li>Projects appear in the order listed above</li>
+                <li>You can edit project names directly in the table</li>
+            </ul>
+        </div>
+    </div>
+    <?php
+}
+
+/**
+ * Admin warnings page
+ */
+function mida_warnings_page() {
+    global $wpdb;
+    $warnings_table = $wpdb->prefix . 'mida_warnings';
+    
+    // Get all warnings with user info
+    $warnings = $wpdb->get_results(
+        "SELECT w.*, u.display_name, u.user_email, s.submitted_at, s.selection_time_display
+        FROM {$warnings_table} w
+        LEFT JOIN {$wpdb->users} u ON w.user_id = u.ID
+        LEFT JOIN {$wpdb->prefix}mida_submissions s ON w.submission_id = s.id
+        ORDER BY w.created_at DESC
+        LIMIT 100",
+        ARRAY_A
+    );
+    
+    ?>
+    <div class="wrap">
+        <h1>Mida Warnings Log</h1>
+        <p>List of all warnings when users selected options different from their restrictions.</p>
+        
+        <?php if (empty($warnings)): ?>
+            <p>No warnings logged yet.</p>
+        <?php else: ?>
+            <table class="wp-list-table widefat fixed striped">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>User</th>
+                        <th>Warning Type</th>
+                        <th>Expected</th>
+                        <th>Actual</th>
+                        <th>Selection Time</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($warnings as $warning): ?>
+                    <tr>
+                        <td><?php echo esc_html(date('d.m.Y H:i', strtotime($warning['created_at']))); ?></td>
+                        <td>
+                            <strong><?php echo esc_html($warning['display_name']); ?></strong><br>
+                            <small><?php echo esc_html($warning['user_email']); ?></small>
+                        </td>
+                        <td><?php echo esc_html($warning['warning_type']); ?></td>
+                        <td><code><?php echo esc_html($warning['expected_value']); ?></code></td>
+                        <td><code><?php echo esc_html($warning['actual_value']); ?></code></td>
+                        <td><?php echo esc_html($warning['selection_time_display']); ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php endif; ?>
+    </div>
+    <?php
+}
 
 /**
  * Multi-step house picking form shortcode - EXACT HTML FROM TARGET
@@ -116,6 +466,18 @@ function mida_house_form_shortcode($atts) {
             LIMIT 3",
             $user_id
         ), ARRAY_A);
+    }
+    
+    // Get projects from settings
+    $projects = get_option('mida_projects', array());
+    if (empty($projects)) {
+        // Default projects if none configured
+        $projects = array(
+            array('name' => 'Yasamal Yaşayış Kompleksi', 'enabled' => false),
+            array('name' => 'Hövsan Yaşayış Kompleksi', 'enabled' => true),
+            array('name' => 'Sumqayıt şəhərində güzəştli mənzillər', 'enabled' => false),
+            array('name' => 'Gəncə Yaşayış Kompleksi', 'enabled' => false),
+        );
     }
     
     ?>
@@ -239,17 +601,11 @@ function mida_house_form_shortcode($atts) {
                                     <h6>Layihə</h6>
                                     <select autocomplete="off" class="" style="max-width: fit-content;">
                                         <option disabled="disabled" selected="selected" hidden="hidden" value="">Layihəni seçin</option>
-                                        <option value="e3eec46c-8f80-42e8-b31c-334efface7c2" disabled="disabled">Yasamal Yaşayış Kompleksi</option>
-                                        <option value="5c1b506e-c751-4252-8d6b-5a78a89458fa">Hövsan Yaşayış Kompleksi</option>
-                                        <option value="3217e53d-8023-4610-8e5c-7b20683174fb" disabled="disabled">Sumqayıt şəhərində güzəştli mənzillər</option>
-                                        <option value="f3ffc990-85c9-4653-bc56-2075f4cce7be" disabled="disabled">Gəncə Yaşayış Kompleksi</option>
-                                        <option value="719a8862-4827-4485-829c-fc4f81b7d100" disabled="disabled">Yasamal Yaşayış Kompleksinin ikinci mərhələsi</option>
-                                        <option value="4bd99e4b-59b1-4d75-ab18-c7f9d6654882">Hövsan Yaşayış Kompleksinin ikinci mərhələsi</option>
-                                        <option value="f72b646c-5ae2-4451-850d-317840567ccc">Lənkəran Yaşayış Kompleksi</option>
-                                        <option value="cd552f9e-a16f-44ed-a900-2646e3b9f816">Sumqayıt Yaşayış Kompleksi</option>
-                                        <option value="25f4cebc-4469-4de6-9993-828c52367e1b">Binəqədi Yaşayış Kompleksi</option>
-                                        <option value="9788c664-aab1-4701-a868-e0b01ffa8ddf">Şirvan Yaşayış Kompleksi</option>
-                                        <option value="d310da24-a222-466e-924e-fd7c12531934">Yevlax Yaşayış Kompleksi</option>
+                                        <?php foreach ($projects as $index => $project): ?>
+                                            <option value="project-<?php echo $index; ?>" <?php echo !$project['enabled'] ? 'disabled="disabled"' : ''; ?>>
+                                                <?php echo esc_html($project['name']); ?>
+                                            </option>
+                                        <?php endforeach; ?>
                                     </select>
                                 </div>
                             </div>
@@ -592,26 +948,111 @@ function mida_save_apartment_selection() {
     $selection_time_ms = isset($_POST['selection_time_ms']) ? intval($_POST['selection_time_ms']) : 0;
     $selection_time_display = isset($_POST['selection_time_display']) ? sanitize_text_field($_POST['selection_time_display']) : '';
     
+    // Get form selections
+    $layihe = isset($_POST['layihe']) ? sanitize_text_field($_POST['layihe']) : '';
+    $odenish_usulu = isset($_POST['odenish_usulu']) ? sanitize_text_field($_POST['odenish_usulu']) : '';
+    $mertebe = isset($_POST['mertebe']) ? sanitize_text_field($_POST['mertebe']) : '';
+    $otaq_sayi = isset($_POST['otaq_sayi']) ? sanitize_text_field($_POST['otaq_sayi']) : '';
+    
     global $wpdb;
     $table_name = $wpdb->prefix . 'mida_submissions';
+    $warnings_table = $wpdb->prefix . 'mida_warnings';
     
     $user_id = get_current_user_id();
     
+    // Check user restrictions
+    $restrictions = get_option('mida_user_restrictions', array());
+    $user_restrictions = isset($restrictions[$user_id]) ? $restrictions[$user_id] : array();
+    
+    $has_warning = 0;
+    $warnings = array();
+    
+    // Check each restriction
+    if (!empty($user_restrictions['layihe']) && $user_restrictions['layihe'] !== $layihe) {
+        $has_warning = 1;
+        $warnings[] = array(
+            'type' => 'Layihə',
+            'expected' => $user_restrictions['layihe'],
+            'actual' => $layihe
+        );
+    }
+    
+    if (!empty($user_restrictions['odenish_usulu']) && $user_restrictions['odenish_usulu'] !== $odenish_usulu) {
+        $has_warning = 1;
+        $warnings[] = array(
+            'type' => 'Ödəniş üsulu',
+            'expected' => $user_restrictions['odenish_usulu'],
+            'actual' => $odenish_usulu
+        );
+    }
+    
+    if (!empty($user_restrictions['mertebe'])) {
+        $allowed_floors = mida_parse_floor_range($user_restrictions['mertebe']);
+        if (!in_array($mertebe, $allowed_floors)) {
+            $has_warning = 1;
+            $warnings[] = array(
+                'type' => 'Mərtəbə',
+                'expected' => $user_restrictions['mertebe'],
+                'actual' => $mertebe
+            );
+        }
+    }
+    
+    if (!empty($user_restrictions['otaq_sayi'])) {
+        $allowed_rooms = array_map('trim', explode(',', $user_restrictions['otaq_sayi']));
+        if (!in_array($otaq_sayi, $allowed_rooms)) {
+            $has_warning = 1;
+            $warnings[] = array(
+                'type' => 'Otaq sayı',
+                'expected' => $user_restrictions['otaq_sayi'],
+                'actual' => $otaq_sayi
+            );
+        }
+    }
+    
+    // Insert submission
     $result = $wpdb->insert(
         $table_name,
         array(
             'user_id' => $user_id,
             'selection_time_ms' => $selection_time_ms,
             'selection_time_display' => $selection_time_display,
+            'layihe' => $layihe,
+            'odenish_usulu' => $odenish_usulu,
+            'mertebe' => $mertebe,
+            'otaq_sayi' => $otaq_sayi,
+            'has_warning' => $has_warning,
             'submitted_at' => current_time('mysql')
         ),
-        array('%d', '%d', '%s', '%s')
+        array('%d', '%d', '%s', '%s', '%s', '%s', '%s', '%d', '%s')
     );
     
     if ($result) {
+        $submission_id = $wpdb->insert_id;
+        
+        // Log warnings
+        if (!empty($warnings)) {
+            foreach ($warnings as $warning) {
+                $wpdb->insert(
+                    $warnings_table,
+                    array(
+                        'submission_id' => $submission_id,
+                        'user_id' => $user_id,
+                        'warning_type' => $warning['type'],
+                        'expected_value' => $warning['expected'],
+                        'actual_value' => $warning['actual'],
+                        'created_at' => current_time('mysql')
+                    ),
+                    array('%d', '%d', '%s', '%s', '%s', '%s')
+                );
+            }
+        }
+        
         wp_send_json_success(array(
             'message' => 'Selection saved successfully',
-            'submission_id' => $wpdb->insert_id
+            'submission_id' => $submission_id,
+            'has_warning' => $has_warning,
+            'warnings' => $warnings
         ));
     } else {
         wp_send_json_error(array('message' => 'Failed to save selection'));
@@ -619,6 +1060,24 @@ function mida_save_apartment_selection() {
 }
 add_action('wp_ajax_mida_save_selection', 'mida_save_apartment_selection');
 add_action('wp_ajax_nopriv_mida_save_selection', 'mida_save_apartment_selection');
+
+/**
+ * Parse floor range string (e.g., "1-5" or "1,2,3")
+ */
+function mida_parse_floor_range($range) {
+    $floors = array();
+    
+    if (strpos($range, '-') !== false) {
+        // Range format: "1-5"
+        list($start, $end) = explode('-', $range);
+        $floors = range(intval($start), intval($end));
+    } else {
+        // Comma-separated: "1,2,3"
+        $floors = array_map('trim', explode(',', $range));
+    }
+    
+    return array_map('strval', $floors);
+}
 
 /**
  * Get top 10 fastest selection times globally
@@ -678,24 +1137,25 @@ function mida_rankings_shortcode($atts) {
     global $wpdb;
     $table_name = $wpdb->prefix . 'mida_submissions';
     
-    // Get global top 10
+    // Get global top 10 (exclude entries with warnings)
     $global_rankings = $wpdb->get_results(
         "SELECT s.id, s.user_id, s.selection_time_ms, s.selection_time_display, s.submitted_at, u.display_name
         FROM {$table_name} s
         LEFT JOIN {$wpdb->users} u ON s.user_id = u.ID
+        WHERE s.has_warning = 0
         ORDER BY s.selection_time_ms ASC
         LIMIT 10",
         ARRAY_A
     );
     
-    // Get user's personal top 10 if logged in
+    // Get user's personal top 10 if logged in (exclude entries with warnings)
     $user_rankings = array();
     if (is_user_logged_in()) {
         $user_id = get_current_user_id();
         $user_rankings = $wpdb->get_results($wpdb->prepare(
             "SELECT id, user_id, selection_time_ms, selection_time_display, submitted_at
             FROM {$table_name}
-            WHERE user_id = %d
+            WHERE user_id = %d AND has_warning = 0
             ORDER BY selection_time_ms ASC
             LIMIT 10",
             $user_id

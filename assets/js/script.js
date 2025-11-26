@@ -544,6 +544,12 @@
             const timerData = stopTimer();
             
             if (timerData) {
+                // Get form selections
+                const layihe = $('select[autocomplete="off"]').val() || '';
+                const odenishUsulu = $('input[name="payment-method"]:checked').val() || '';
+                const otaqSayi = selectedApartment.rooms || '';
+                const mertebe = selectedApartment.floor || '';
+                
                 // Save selection with timer data to database
                 $.ajax({
                     url: midaAjax.ajaxurl,
@@ -552,13 +558,26 @@
                         action: 'mida_save_selection',
                         nonce: midaAjax.save_selection_nonce,
                         selection_time_ms: timerData.elapsed_ms,
-                        selection_time_display: timerData.display
+                        selection_time_display: timerData.display,
+                        layihe: layihe,
+                        odenish_usulu: odenishUsulu,
+                        otaq_sayi: otaqSayi,
+                        mertebe: mertebe
                     },
                     success: function(response) {
                         console.log('Selection saved:', response);
                         if (response.success) {
                             // Store submission ID for later use
                             sessionStorage.setItem('mida_submission_id', response.data.submission_id);
+                            
+                            // Check for warnings
+                            if (response.data.has_warning && response.data.warnings.length > 0) {
+                                let warningMsg = 'XƏBƏRDARLIQ: Seçiminiz qeydə alındı, lakin reytinqə daxil olmayacaq.\n\n';
+                                response.data.warnings.forEach(function(w) {
+                                    warningMsg += w.type + ': Gözlənilən "' + w.expected + '", Seçilən "' + w.actual + '"\n';
+                                });
+                                alert(warningMsg);
+                            }
                         }
                     },
                     error: function(xhr, status, error) {
