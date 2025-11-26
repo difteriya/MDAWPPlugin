@@ -1,6 +1,6 @@
 # Mida WordPress Plugin
 
-**Version:** 1.2.1  
+**Version:** 1.3.0  
 **Author:** difteriya  
 **Website:** [xudiyev.com](https://xudiyev.com)  
 **Description:** MIDA oyunu üçün lazım olan hər şey
@@ -227,6 +227,18 @@ Mida/
 ```
 
 ## 🔄 Version History
+
+## 🔄 Version History
+
+### 1.3.0 (2025-11-26)
+- ✅ **NEW:** Comprehensive Timing Logs page with performance analytics
+- ✅ User performance summary with best/slowest/average times
+- ✅ Performance improvement tracking (slowest to best)
+- ✅ Performance distribution analysis (Fast/Medium/Slow attempts)
+- ✅ Detailed attempts log with 200 most recent entries
+- ✅ User filtering for individual performance analysis
+- ✅ Visual indicators for performance categories
+- ✅ Struggle pattern identification
 
 ### 1.2.1 (2025-11-26)
 - ✅ Added GitHub auto-update functionality
