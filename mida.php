@@ -156,6 +156,15 @@ function mida_admin_menu() {
     
     add_submenu_page(
         'mida-settings',
+        'Timing Logs',
+        'Timing Logs',
+        'manage_options',
+        'mida-timing-logs',
+        'mida_timing_logs_page'
+    );
+    
+    add_submenu_page(
+        'mida-settings',
         'Plugin Updates',
         'Updates',
         'manage_options',
@@ -528,6 +537,283 @@ function mida_warnings_page() {
                 </table>
                 <p style="margin-top: 15px; color: #666;">
                     <em>Showing <?php echo count($warnings); ?> warning(s)<?php if ($selected_user > 0): ?> for selected user<?php endif; ?></em>
+                </p>
+            <?php endif; ?>
+        </div>
+    </div>
+    <?php
+}
+
+/**
+ * Timing Logs page - Performance monitoring
+ */
+function mida_timing_logs_page() {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'mida_submissions';
+    
+    // Get selected user filter
+    $selected_user = isset($_GET['filter_user']) ? intval($_GET['filter_user']) : 0;
+    
+    // Get user statistics
+    $user_stats = $wpdb->get_results(
+        "SELECT 
+            user_id,
+            u.display_name,
+            u.user_email,
+            COUNT(*) as total_attempts,
+            MIN(selection_time_ms) as best_time_ms,
+            MAX(selection_time_ms) as slowest_time_ms,
+            AVG(selection_time_ms) as avg_time_ms,
+            MIN(selection_time_display) as best_time_display,
+            MAX(selection_time_display) as slowest_time_display,
+            SUM(CASE WHEN has_warning = 1 THEN 1 ELSE 0 END) as warnings_count,
+            SUM(CASE WHEN has_warning = 0 THEN 1 ELSE 0 END) as valid_attempts
+        FROM {$table_name} s
+        LEFT JOIN {$wpdb->users} u ON s.user_id = u.ID
+        GROUP BY user_id
+        ORDER BY best_time_ms ASC",
+        ARRAY_A
+    );
+    
+    // Build WHERE clause for filtering
+    $where_clause = 'WHERE 1=1';
+    if ($selected_user > 0) {
+        $where_clause .= $wpdb->prepare(" AND user_id = %d", $selected_user);
+    }
+    
+    // Get detailed attempts (filtered or all)
+    $attempts = $wpdb->get_results(
+        "SELECT s.*, u.display_name, u.user_email
+        FROM {$table_name} s
+        LEFT JOIN {$wpdb->users} u ON s.user_id = u.ID
+        {$where_clause}
+        ORDER BY s.submitted_at DESC
+        LIMIT 200",
+        ARRAY_A
+    );
+    
+    // Calculate performance categories
+    $performance_distribution = array();
+    if ($selected_user > 0 && !empty($attempts)) {
+        $fast_count = 0;
+        $medium_count = 0;
+        $slow_count = 0;
+        
+        $user_best = min(array_column($attempts, 'selection_time_ms'));
+        
+        foreach ($attempts as $attempt) {
+            $time_ms = $attempt['selection_time_ms'];
+            $diff_percent = (($time_ms - $user_best) / $user_best) * 100;
+            
+            if ($diff_percent <= 10) {
+                $fast_count++;
+            } elseif ($diff_percent <= 30) {
+                $medium_count++;
+            } else {
+                $slow_count++;
+            }
+        }
+        
+        $performance_distribution = array(
+            'fast' => $fast_count,
+            'medium' => $medium_count,
+            'slow' => $slow_count
+        );
+    }
+    
+    ?>
+    <div class="wrap">
+        <h1>⏱️ Timing Logs & Performance Monitor</h1>
+        <p>Detailed performance analysis for all users and their selection times.</p>
+        
+        <!-- Overall Statistics -->
+        <?php if (!empty($user_stats)): ?>
+        <div class="card" style="max-width: 100%; margin-bottom: 20px;">
+            <h2>📊 User Performance Summary</h2>
+            <table class="wp-list-table widefat fixed striped">
+                <thead>
+                    <tr>
+                        <th style="width: 200px;">User</th>
+                        <th style="width: 80px; text-align: center;">Total Attempts</th>
+                        <th style="width: 80px; text-align: center;">Valid</th>
+                        <th style="width: 80px; text-align: center;">Warnings</th>
+                        <th style="width: 120px; text-align: center;">🏆 Best Time</th>
+                        <th style="width: 120px; text-align: center;">🐢 Slowest</th>
+                        <th style="width: 120px; text-align: center;">📈 Average</th>
+                        <th style="width: 100px; text-align: center;">Performance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($user_stats as $stat): 
+                        $avg_display = gmdate("i:s", floor($stat['avg_time_ms'] / 1000)) . '.' . str_pad(floor($stat['avg_time_ms'] % 1000), 3, '0', STR_PAD_LEFT);
+                        $improvement = $stat['slowest_time_ms'] > 0 ? (($stat['slowest_time_ms'] - $stat['best_time_ms']) / $stat['slowest_time_ms'] * 100) : 0;
+                    ?>
+                    <tr>
+                        <td>
+                            <strong><?php echo esc_html($stat['display_name']); ?></strong><br>
+                            <small><?php echo esc_html($stat['user_email']); ?></small>
+                        </td>
+                        <td style="text-align: center;"><strong><?php echo esc_html($stat['total_attempts']); ?></strong></td>
+                        <td style="text-align: center;"><span style="color: #28a745;"><?php echo esc_html($stat['valid_attempts']); ?></span></td>
+                        <td style="text-align: center;"><span style="color: #dc3545;"><?php echo esc_html($stat['warnings_count']); ?></span></td>
+                        <td style="text-align: center;">
+                            <code style="background: #d4edda; color: #155724; padding: 3px 8px; font-weight: bold;">
+                                <?php echo esc_html($stat['best_time_display']); ?>
+                            </code>
+                        </td>
+                        <td style="text-align: center;">
+                            <code style="background: #f8d7da; color: #721c24; padding: 3px 8px;">
+                                <?php echo esc_html($stat['slowest_time_display']); ?>
+                            </code>
+                        </td>
+                        <td style="text-align: center;">
+                            <code style="background: #e7f3ff; color: #004085; padding: 3px 8px;">
+                                <?php echo esc_html($avg_display); ?>
+                            </code>
+                        </td>
+                        <td style="text-align: center;">
+                            <span style="color: <?php echo $improvement >= 30 ? '#28a745' : ($improvement >= 15 ? '#ffc107' : '#6c757d'); ?>">
+                                <?php echo round($improvement, 1); ?>% ↓
+                            </span>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+            <p style="margin-top: 10px; color: #666; font-size: 12px;">
+                <strong>Performance:</strong> Shows improvement from slowest to best time. 
+                <span style="color: #28a745;">Green (≥30%)</span> = Great improvement, 
+                <span style="color: #ffc107;">Yellow (15-29%)</span> = Good, 
+                <span style="color: #6c757d;">Gray (&lt;15%)</span> = Consistent
+            </p>
+        </div>
+        <?php endif; ?>
+        
+        <!-- Filter Section -->
+        <div class="card" style="max-width: 100%; margin-bottom: 20px;">
+            <h2>🔍 Filter by User</h2>
+            <form method="get" action="">
+                <input type="hidden" name="page" value="mida-timing-logs">
+                <select name="filter_user" id="filter_user" style="min-width: 300px;">
+                    <option value="0">All Users</option>
+                    <?php foreach ($user_stats as $stat): ?>
+                        <option value="<?php echo esc_attr($stat['user_id']); ?>" <?php selected($selected_user, $stat['user_id']); ?>>
+                            <?php echo esc_html($stat['display_name']); ?> (<?php echo esc_html($stat['total_attempts']); ?> attempts - Best: <?php echo esc_html($stat['best_time_display']); ?>)
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <button type="submit" class="button button-primary">Apply Filter</button>
+                <?php if ($selected_user > 0): ?>
+                    <a href="?page=mida-timing-logs" class="button">Clear Filter</a>
+                <?php endif; ?>
+            </form>
+        </div>
+        
+        <!-- Performance Distribution (when user filtered) -->
+        <?php if ($selected_user > 0 && !empty($performance_distribution)): ?>
+        <div class="card" style="max-width: 100%; margin-bottom: 20px;">
+            <h2>📈 Performance Distribution</h2>
+            <div style="display: flex; gap: 20px; align-items: center;">
+                <div style="flex: 1; text-align: center; padding: 15px; background: #d4edda; border-radius: 5px;">
+                    <div style="font-size: 32px; font-weight: bold; color: #155724;">
+                        <?php echo esc_html($performance_distribution['fast']); ?>
+                    </div>
+                    <div style="color: #155724; font-weight: 600;">Fast Attempts</div>
+                    <small style="color: #666;">Within 10% of best</small>
+                </div>
+                <div style="flex: 1; text-align: center; padding: 15px; background: #fff3cd; border-radius: 5px;">
+                    <div style="font-size: 32px; font-weight: bold; color: #856404;">
+                        <?php echo esc_html($performance_distribution['medium']); ?>
+                    </div>
+                    <div style="color: #856404; font-weight: 600;">Medium Attempts</div>
+                    <small style="color: #666;">10-30% slower</small>
+                </div>
+                <div style="flex: 1; text-align: center; padding: 15px; background: #f8d7da; border-radius: 5px;">
+                    <div style="font-size: 32px; font-weight: bold; color: #721c24;">
+                        <?php echo esc_html($performance_distribution['slow']); ?>
+                    </div>
+                    <div style="color: #721c24; font-weight: 600;">Slow Attempts</div>
+                    <small style="color: #666;">More than 30% slower</small>
+                </div>
+            </div>
+            <p style="margin-top: 15px; color: #666; text-align: center;">
+                <strong>Analysis:</strong> Shows where the user struggles most. High "Slow Attempts" indicates inconsistency.
+            </p>
+        </div>
+        <?php endif; ?>
+        
+        <!-- Detailed Attempts Log -->
+        <div class="card" style="max-width: 100%;">
+            <h2>📋 Detailed Attempts Log <?php if ($selected_user > 0): ?><span style="color: #2271b1;">(Filtered)</span><?php endif; ?></h2>
+            <?php if (empty($attempts)): ?>
+                <p>No attempts found.</p>
+            <?php else: ?>
+                <table class="wp-list-table widefat fixed striped">
+                    <thead>
+                        <tr>
+                            <th style="width: 150px;">Date & Time</th>
+                            <th style="width: 180px;">User</th>
+                            <th style="width: 120px; text-align: center;">Time</th>
+                            <th style="width: 150px;">Layihə</th>
+                            <th style="width: 130px;">Ödəniş</th>
+                            <th style="width: 100px;">Mərtəbə</th>
+                            <th style="width: 100px;">Otaq sayı</th>
+                            <th style="width: 80px; text-align: center;">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php 
+                        $prev_user_id = null;
+                        foreach ($attempts as $attempt): 
+                            $is_warning = $attempt['has_warning'] == 1;
+                            $row_style = $is_warning ? 'background-color: #fff3cd;' : '';
+                            
+                            // Calculate performance indicator for filtered user
+                            $performance_indicator = '';
+                            if ($selected_user > 0 && !empty($user_stats)) {
+                                $user_best = $user_stats[0]['best_time_ms'];
+                                $diff_percent = (($attempt['selection_time_ms'] - $user_best) / $user_best) * 100;
+                                
+                                if ($diff_percent <= 10) {
+                                    $performance_indicator = '<span style="color: #28a745; font-weight: bold;">🚀 Fast</span>';
+                                } elseif ($diff_percent <= 30) {
+                                    $performance_indicator = '<span style="color: #ffc107; font-weight: bold;">⚡ Medium</span>';
+                                } else {
+                                    $performance_indicator = '<span style="color: #dc3545; font-weight: bold;">🐢 Slow</span>';
+                                }
+                            }
+                        ?>
+                        <tr style="<?php echo $row_style; ?>">
+                            <td><?php echo esc_html(date('d.m.Y H:i:s', strtotime($attempt['submitted_at']))); ?></td>
+                            <td>
+                                <strong><?php echo esc_html($attempt['display_name']); ?></strong><br>
+                                <small><?php echo esc_html($attempt['user_email']); ?></small>
+                            </td>
+                            <td style="text-align: center;">
+                                <code style="background: #e7f3ff; padding: 3px 8px; font-weight: bold; font-size: 13px;">
+                                    <?php echo esc_html($attempt['selection_time_display']); ?>
+                                </code>
+                                <?php if ($performance_indicator): ?>
+                                    <br><?php echo $performance_indicator; ?>
+                                <?php endif; ?>
+                            </td>
+                            <td><?php echo esc_html($attempt['layihe'] ?: '-'); ?></td>
+                            <td><?php echo esc_html($attempt['odenish_usulu'] ?: '-'); ?></td>
+                            <td><?php echo esc_html($attempt['mertebe'] ?: '-'); ?></td>
+                            <td><?php echo esc_html($attempt['otaq_sayi'] ?: '-'); ?></td>
+                            <td style="text-align: center;">
+                                <?php if ($is_warning): ?>
+                                    <span style="background: #dc3545; color: white; padding: 3px 8px; border-radius: 3px; font-size: 11px; font-weight: bold;">⚠️ WARNING</span>
+                                <?php else: ?>
+                                    <span style="background: #28a745; color: white; padding: 3px 8px; border-radius: 3px; font-size: 11px; font-weight: bold;">✅ VALID</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+                <p style="margin-top: 15px; color: #666;">
+                    <em>Showing <?php echo count($attempts); ?> attempt(s)<?php if ($selected_user > 0): ?> for selected user<?php endif; ?> (limited to 200 most recent)</em>
                 </p>
             <?php endif; ?>
         </div>
