@@ -1,11 +1,11 @@
 <?php
 /**
  * Plugin Name: Mida
- * Plugin URI: https://example.com/mida
- * Description: A custom WordPress plugin - Pixel Perfect MIDA Form
- * Version: 1.0.0
- * Author: Your Name
- * Author URI: https://example.com
+ * Plugin URI: https://xudiyev.com
+ * Description: MIDA oyunu üçün lazım olan hər şey
+ * Version: 1.2.0
+ * Author: difteriya
+ * Author URI: https://xudiyev.com
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: mida
@@ -18,7 +18,7 @@ if (!defined('WPINC')) {
 }
 
 // Define plugin constants
-define('MIDA_VERSION', '1.0.0');
+define('MIDA_VERSION', '1.2.0');
 define('MIDA_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('MIDA_PLUGIN_URL', plugin_dir_url(__FILE__));
 
