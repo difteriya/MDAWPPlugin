@@ -1,6 +1,6 @@
 # Mida WordPress Plugin
 
-**Version:** 1.3.0  
+**Version:** 1.4.0  
 **Author:** difteriya  
 **Website:** [xudiyev.com](https://xudiyev.com)  
 **Description:** MIDA oyunu üçün lazım olan hər şey
@@ -229,6 +229,18 @@ Mida/
 ## 🔄 Version History
 
 ## 🔄 Version History
+
+### 1.4.0 (2025-11-30)
+- ✅ **NEW:** Dual birthdate captcha system with 2 random types
+- ✅ Light theme captcha design with left alignment
+- ✅ Single shared numpad with auto-switching (day→month→year)
+- ✅ Backspace functionality replacing submit button
+- ✅ Auto-submit when complete (validates automatically)
+- ✅ Step 1: Captcha required for "Növbəti" button
+- ✅ Step 2: Captcha required for "Axtar" button
+- ✅ Admin: Birthdate field in user restrictions
+- ✅ Enhanced form validation with captcha integration
+- ✅ Console logging for debugging validation flow
 
 ### 1.3.0 (2025-11-26)
 - ✅ **NEW:** Comprehensive Timing Logs page with performance analytics
