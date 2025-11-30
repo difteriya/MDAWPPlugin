@@ -431,7 +431,7 @@
         });
 
         // Update search button state
-        function updateSearchButtonState() {
+        window.updateSearchButtonState = function() {
             const buildingSelected = $('#step-axtaris .list-group-item[data-building-type].active').length > 0;
             const hasRoomSelection = $('#step-axtaris .list-group-item[data-rooms].active').length > 0;
             const minFloor = $('#step-axtaris select[name="min_floor"]').val();
@@ -444,13 +444,19 @@
                 maxFloor: maxFloor
             });
             
-            // Enable search only if building type selected AND rooms selected
+            // Enable search only if building type selected AND rooms selected AND captcha verified
             // Floor selection is optional
-            if (buildingSelected && hasRoomSelection) {
-                console.log('Enabling search button');
+            const captchaVerified = $('#captcha-verified-step2').val() === '1';
+            
+            if (buildingSelected && hasRoomSelection && captchaVerified) {
+                console.log('Enabling search button - all conditions met');
                 $('#search-apartments').prop('disabled', false);
             } else {
-                console.log('Disabling search button');
+                console.log('Disabling search button - missing:', {
+                    buildingSelected,
+                    hasRoomSelection,
+                    captchaVerified
+                });
                 $('#search-apartments').prop('disabled', true);
             }
         }
@@ -670,6 +676,741 @@
 
         // Initialize
         updateBreadcrumbForStep(1);
+    });
+
+    // ==================== BIRTHDATE CAPTCHA ====================
+    $(document).ready(function() {
+        let dayInput = '';
+        let monthInput = '';
+        let yearInput = '';
+        let captchaDay = 1;
+        let captchaMonth = 1;
+        let captchaYear = 2000;
+        let currentCaptchaType = 1;
+        
+        // Shuffle array function
+        function shuffleArray(array) {
+            const arr = [...array];
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+        
+        // Get random captcha type (1-2)
+        function getRandomCaptchaType() {
+            return Math.floor(Math.random() * 2) + 1;
+        }
+        
+        // Month names in Azerbaijani
+        const monthNamesShort = ['Yan.', 'Fev.', 'Mar.', 'Apr.', 'May.', 'İyun.', 'İyul.', 'Avq.', 'Sen.', 'Okt.', 'Noy.', 'Dek.'];
+        
+        // Generate number pad with shuffled numbers
+        function generateNumPad(containerId, inputFieldId, maxLength, inputType) {
+            const numbers = shuffleArray([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+            const container = $(containerId);
+            container.empty();
+            
+            // Always generate 3x4 grid: 10 numbers + clear + submit
+            // Add 9 number buttons
+            numbers.slice(0, 9).forEach(num => {
+                const btn = $('<button>')
+                    .attr('type', 'button')
+                    .addClass('numpad-btn')
+                    .attr('data-num', num)
+                    .attr('data-input-type', inputType)
+                    .css({
+                        'background': '#fff',
+                        'color': '#212529',
+                        'border': '2px solid #dee2e6',
+                        'padding': '12px',
+                        'border-radius': '4px',
+                        'cursor': 'pointer',
+                        'font-size': '18px',
+                        'font-weight': '600',
+                        'transition': 'all 0.2s'
+                    })
+                    .text(num);
+                container.append(btn);
+            });
+            
+            // Add clear button (red X)
+            const clearBtn = $('<button>')
+                .attr('type', 'button')
+                .attr('id', containerId.replace('#', '') + '-clear')
+                .attr('data-input-type', inputType)
+                .css({
+                    'background': '#dc3545',
+                    'color': '#fff',
+                    'border': '2px solid #dc3545',
+                    'padding': '12px',
+                    'border-radius': '4px',
+                    'cursor': 'pointer',
+                    'font-size': '18px',
+                    'font-weight': '600',
+                    'transition': 'all 0.2s'
+                })
+                .text('✕');
+            container.append(clearBtn);
+            
+            // Add last number
+            const lastNumBtn = $('<button>')
+                .attr('type', 'button')
+                .addClass('numpad-btn')
+                .attr('data-num', numbers[9])
+                .attr('data-input-type', inputType)
+                .css({
+                    'background': '#fff',
+                    'color': '#212529',
+                    'border': '2px solid #dee2e6',
+                    'padding': '12px',
+                    'border-radius': '4px',
+                    'cursor': 'pointer',
+                    'font-size': '18px',
+                    'font-weight': '600',
+                    'transition': 'all 0.2s'
+                })
+                .text(numbers[9]);
+            container.append(lastNumBtn);
+            
+            // Add backspace button - for all input types
+            const backspaceBtn = $('<button>')
+                .attr('type', 'button')
+                .attr('id', containerId.replace('#', '') + '-backspace')
+                .attr('data-input-type', inputType)
+                .css({
+                    'background': '#ffc107',
+                    'color': '#000',
+                    'border': '2px solid #ffc107',
+                    'padding': '12px',
+                    'border-radius': '4px',
+                    'cursor': 'pointer',
+                    'font-size': '18px',
+                    'transition': 'all 0.2s',
+                    'font-weight': '600'
+                })
+                .text('⌫');
+            container.append(backspaceBtn);
+            
+            // Add empty placeholder for grid alignment
+            const emptyBtn = $('<div>')
+                .css({
+                    'background': 'transparent',
+                    'border': 'none'
+                });
+            container.append(emptyBtn);
+            
+            // Add hover effects
+            container.find('button').hover(
+                function() {
+                    $(this).css({
+                        'transform': 'scale(1.05)',
+                        'box-shadow': '0 4px 12px rgba(0,0,0,0.15)'
+                    });
+                },
+                function() {
+                    $(this).css({
+                        'transform': 'scale(1)',
+                        'box-shadow': 'none'
+                    });
+                }
+            );
+            
+            // Number button click
+            container.on('click', '.numpad-btn', function() {
+                const num = $(this).data('num');
+                const type = $(this).data('input-type');
+                const isStep2 = inputFieldId.includes('step2');
+                
+                // Use appropriate variables based on which step
+                let currentDayInput = isStep2 ? (window.dayInputStep2 || '') : dayInput;
+                let currentMonthInput = isStep2 ? (window.monthInputStep2 || '') : monthInput;
+                let currentYearInput = isStep2 ? (window.yearInputStep2 || '') : yearInput;
+                
+                if (type === 'day') {
+                    // Auto-switch to month after 2 digits
+                    if (currentDayInput.length < 2) {
+                        currentDayInput += num;
+                        $(inputFieldId).text(currentDayInput);
+                        
+                        // Update the appropriate variable
+                        if (isStep2) {
+                            window.dayInputStep2 = currentDayInput;
+                        } else {
+                            dayInput = currentDayInput;
+                        }
+                        
+                        // Switch to month input after 2 digits
+                        if (currentDayInput.length === 2) {
+                            $(containerId).find('.numpad-btn').data('input-type', 'month');
+                            $(containerId).find('[id$="-clear"]').data('input-type', 'month');
+                            $(containerId).find('[id$="-backspace"]').data('input-type', 'month');
+                        }
+                    }
+                } else if (type === 'month') {
+                    // Auto-switch to year after 2 digits
+                    if (currentMonthInput.length < 2) {
+                        currentMonthInput += num;
+                        $(inputFieldId.replace('day', 'month')).text(currentMonthInput);
+                        
+                        // Update the appropriate variable
+                        if (isStep2) {
+                            window.monthInputStep2 = currentMonthInput;
+                        } else {
+                            monthInput = currentMonthInput;
+                        }
+                        
+                        // Switch to year input after 2 digits
+                        if (currentMonthInput.length === 2) {
+                            $(containerId).find('.numpad-btn').data('input-type', 'year');
+                            $(containerId).find('[id$="-clear"]').data('input-type', 'year');
+                            $(containerId).find('[id$="-backspace"]').data('input-type', 'year');
+                        }
+                    }
+                } else if (type === 'year') {
+                    if (currentYearInput.length < 4) {
+                        currentYearInput += num;
+                        $(inputFieldId.replace('day', 'year')).text(currentYearInput);
+                        
+                        // Update the appropriate variable
+                        if (isStep2) {
+                            window.yearInputStep2 = currentYearInput;
+                        } else {
+                            yearInput = currentYearInput;
+                        }
+                        
+                        // Auto-submit when year is complete
+                        if (currentYearInput.length === 4) {
+                            if (isStep2) {
+                                validateCaptchaStep2();
+                            } else {
+                                validateCaptcha();
+                            }
+                        }
+                    }
+                } else if (type === 'full') {
+                    const $field = $(inputFieldId);
+                    const currentVal = $field.text().replace(/--\.--.----/, '');
+                    const digitsOnly = currentVal.replace(/\./g, '');
+                    const isStep2 = inputFieldId.includes('step2');
+                    
+                    if (digitsOnly.length < 8) {
+                        // For DD.MM.YYYY format, automatically insert dots
+                        let newDigits = digitsOnly + num;
+                        
+                        // Format with dots: DD.MM.YYYY
+                        let formatted = newDigits;
+                        if (newDigits.length > 2) {
+                            formatted = newDigits.substring(0, 2) + '.' + newDigits.substring(2);
+                        }
+                        if (newDigits.length > 4) {
+                            formatted = newDigits.substring(0, 2) + '.' + newDigits.substring(2, 4) + '.' + newDigits.substring(4);
+                        }
+                        $field.text(formatted);
+                        
+                        // Auto-submit when complete
+                        if (newDigits.length === 8) {
+                            if (isStep2) {
+                                validateCaptchaStep2();
+                            } else {
+                                validateCaptcha();
+                            }
+                        }
+                    }
+                }
+                const errorDiv = inputFieldId.includes('step2') ? '#captcha-error-step2' : '#captcha-error';
+                $(errorDiv).hide();
+            });
+            
+            // Clear button
+            container.on('click', '[id$="-clear"]', function() {
+                const type = $(this).data('input-type');
+                const isStep2 = inputFieldId.includes('step2');
+                
+                if (type === 'day' || type === 'month' || type === 'year') {
+                    // Reset all inputs
+                    if (isStep2) {
+                        window.dayInputStep2 = '';
+                        window.monthInputStep2 = '';
+                        window.yearInputStep2 = '';
+                        $('#captcha-day-input-step2').text('--');
+                        $('#captcha-month-input-step2').text('--');
+                        $('#captcha-year-input-step2').text('----');
+                    } else {
+                        dayInput = '';
+                        monthInput = '';
+                        yearInput = '';
+                        $('#captcha-day-input').text('--');
+                        $('#captcha-month-input').text('--');
+                        $('#captcha-year-input').text('----');
+                    }
+                    // Always reset to day input
+                    $(containerId).find('.numpad-btn').data('input-type', 'day');
+                    $(this).data('input-type', 'day');
+                    $(containerId).find('[id$="-backspace"]').data('input-type', 'day');
+                } else if (type === 'full') {
+                    // Clear all for single input captchas
+                    $(inputFieldId).text('--.--.----');
+                }
+                const errorDiv = isStep2 ? '#captcha-error-step2' : '#captcha-error';
+                $(errorDiv).hide();
+            });
+            
+            // Backspace button
+            container.on('click', '[id$="-backspace"]', function() {
+                const type = $(this).data('input-type');
+                const isStep2 = inputFieldId.includes('step2');
+                
+                if (type === 'day') {
+                    const currentDayInput = isStep2 ? (window.dayInputStep2 || '') : dayInput;
+                    if (currentDayInput.length > 0) {
+                        const newVal = currentDayInput.slice(0, -1);
+                        if (isStep2) {
+                            window.dayInputStep2 = newVal;
+                            $('#captcha-day-input-step2').text(newVal || '--');
+                        } else {
+                            dayInput = newVal;
+                            $('#captcha-day-input').text(newVal || '--');
+                        }
+                    }
+                } else if (type === 'month') {
+                    const currentMonthInput = isStep2 ? (window.monthInputStep2 || '') : monthInput;
+                    if (currentMonthInput.length > 0) {
+                        const newVal = currentMonthInput.slice(0, -1);
+                        if (isStep2) {
+                            window.monthInputStep2 = newVal;
+                            $('#captcha-month-input-step2').text(newVal || '--');
+                        } else {
+                            monthInput = newVal;
+                            $('#captcha-month-input').text(newVal || '--');
+                        }
+                        
+                        // Switch back to day if month becomes empty
+                        if (newVal.length === 0) {
+                            $(containerId).find('.numpad-btn').data('input-type', 'day');
+                            $(containerId).find('[id$="-clear"]').data('input-type', 'day');
+                            $(this).data('input-type', 'day');
+                        }
+                    }
+                } else if (type === 'year') {
+                    const currentYearInput = isStep2 ? (window.yearInputStep2 || '') : yearInput;
+                    if (currentYearInput.length > 0) {
+                        const newVal = currentYearInput.slice(0, -1);
+                        if (isStep2) {
+                            window.yearInputStep2 = newVal;
+                            $('#captcha-year-input-step2').text(newVal || '----');
+                        } else {
+                            yearInput = newVal;
+                            $('#captcha-year-input').text(newVal || '----');
+                        }
+                        
+                        // Switch back to month if year becomes empty
+                        if (newVal.length === 0) {
+                            $(containerId).find('.numpad-btn').data('input-type', 'month');
+                            $(containerId).find('[id$="-clear"]').data('input-type', 'month');
+                            $(this).data('input-type', 'month');
+                        }
+                    }
+                } else if (type === 'full') {
+                    const $field = $(inputFieldId);
+                    const currentVal = $field.text().replace(/--\.--\.----/, '');
+                    const digitsOnly = currentVal.replace(/\./g, '');
+                    
+                    if (digitsOnly.length > 0) {
+                        const newDigits = digitsOnly.slice(0, -1);
+                        
+                        if (newDigits.length === 0) {
+                            $field.text('--.--.----');
+                        } else {
+                            // Reformat with dots
+                            let formatted = newDigits;
+                            if (newDigits.length > 2) {
+                                formatted = newDigits.substring(0, 2) + '.' + newDigits.substring(2);
+                            }
+                            if (newDigits.length > 4) {
+                                formatted = newDigits.substring(0, 2) + '.' + newDigits.substring(2, 4) + '.' + newDigits.substring(4);
+                            }
+                            $field.text(formatted);
+                        }
+                    }
+                }
+                const errorDiv = isStep2 ? '#captcha-error-step2' : '#captcha-error';
+                $(errorDiv).hide();
+            });
+        }
+        
+        // Update step 1 validation to include captcha
+        function validateStep1() {
+            const projectSelected = $('select[autocomplete="off"]').val();
+            const paymentSelected = $('input[name="payment-method"]:checked').val();
+            const captchaVerified = $('#captcha-verified').val() === '1';
+            
+            console.log('=== validateStep1 Debug ===');
+            console.log('Project selected:', projectSelected);
+            console.log('Payment selected:', paymentSelected);
+            console.log('Captcha verified value:', $('#captcha-verified').val());
+            console.log('Captcha verified (boolean):', captchaVerified);
+            console.log('All conditions met:', projectSelected && paymentSelected && captchaVerified);
+            
+            if (projectSelected && paymentSelected && captchaVerified) {
+                console.log('✓ Enabling next button');
+                $('#btn-next-step1').prop('disabled', false);
+            } else {
+                console.log('✗ Disabling next button');
+                $('#btn-next-step1').prop('disabled', true);
+            }
+        }
+        
+        // Validate captcha
+        function validateCaptcha() {
+            let userAnswer = '';
+            const paddedDay = String(captchaDay).padStart(2, '0');
+            const paddedMonth = String(captchaMonth).padStart(2, '0');
+            const correctAnswer = paddedDay + paddedMonth + captchaYear; // e.g., "10011985"
+            
+            // Get user answer based on captcha type
+            switch(currentCaptchaType) {
+                case 1: // Day/Month/Year with separate numpads
+                    const enteredDay = dayInput.padStart(2, '0');
+                    const enteredMonth = monthInput.padStart(2, '0');
+                    const enteredYear = yearInput;
+                    
+                    if (!dayInput || !monthInput || !yearInput) {
+                        $('#captcha-error').css('color', '#dc3545').text('Bütün sahələri doldurun!').show();
+                        return;
+                    }
+                    
+                    if (dayInput.length < 1 || dayInput.length > 2) {
+                        $('#captcha-error').css('color', '#dc3545').text('Gün 2 rəqəmdən ibarət olmalıdır!').show();
+                        return;
+                    }
+                    
+                    if (monthInput.length < 1 || monthInput.length > 2) {
+                        $('#captcha-error').css('color', '#dc3545').text('Ay 2 rəqəmdən ibarət olmalıdır!').show();
+                        return;
+                    }
+                    
+                    if (yearInput.length !== 4) {
+                        $('#captcha-error').css('color', '#dc3545').text('İl 4 rəqəmdən ibarət olmalıdır!').show();
+                        return;
+                    }
+                    
+                    userAnswer = enteredDay + enteredMonth + enteredYear;
+                    break;
+                    
+                case 2: // DD.MM.YYYY format with dots
+                    userAnswer = $('#captcha-full-input').text().replace(/\./g, '').replace(/-/g, '').trim();
+                    
+                    if (!userAnswer) {
+                        $('#captcha-error').css('color', '#dc3545').text('Cavabı daxil edin!').show();
+                        return;
+                    }
+                    
+                    if (userAnswer.length !== 8) {
+                        $('#captcha-error').css('color', '#dc3545').text('Tam tarixi daxil edin (GG.AA.YYYY)!').show();
+                        return;
+                    }
+                    break;
+            }
+            
+            // Check if answer is correct
+            const isCorrect = (userAnswer === correctAnswer);
+            
+            // Handle result
+            if (isCorrect) {
+                console.log('=== Captcha Success ===');
+                console.log('Setting captcha-verified to 1');
+                $('#captcha-verified').val('1');
+                console.log('Captcha-verified value after set:', $('#captcha-verified').val());
+                
+                $('#captcha-error').text('').hide();
+                $('#birthdate-captcha').css({
+                    'border': '2px solid #28a745',
+                    'background': '#d4edda'
+                });
+                
+                // Show success message
+                $('#captcha-error').css('color', '#28a745').text('✓ Doğum tarixi təsdiqləndi!').show();
+                
+                // Enable next button
+                console.log('Calling validateStep1()...');
+                validateStep1();
+            } else {
+                console.log('=== Captcha Failed ===');
+                console.log('User answer:', userAnswer);
+                console.log('Correct answer:', correctAnswer);
+                $('#captcha-verified').val('0');
+                $('#captcha-error').css('color', '#dc3545').text('Yanlış cavab! Yenidən cəhd edin.').show();
+                
+                // Reset inputs
+                dayInput = '';
+                monthInput = '';
+                yearInput = '';
+                $('#captcha-day-input').text('--');
+                $('#captcha-month-input').text('--');
+                $('#captcha-year-input').text('----');
+                $('#captcha-full-input').text('--.--.----');
+                
+                $('#birthdate-captcha').css({
+                    'border': '2px solid #dc3545',
+                    'background': '#f8d7da'
+                });
+            }
+        }
+        
+        // Initialize with user's actual birthdate from restrictions
+        if (typeof midaUserRestrictions !== 'undefined' && midaUserRestrictions.birthdate) {
+            const birthParts = midaUserRestrictions.birthdate.split('-'); // YYYY-MM-DD
+            if (birthParts.length === 3) {
+                captchaYear = parseInt(birthParts[0]);
+                captchaMonth = parseInt(birthParts[1]);
+                captchaDay = parseInt(birthParts[2]);
+                
+                $('#captcha-answer').val(captchaDay + '/' + captchaMonth + '/' + captchaYear);
+            }
+        } else {
+            // Fallback: should not happen if admin configured properly
+            captchaDay = 15;
+            captchaMonth = 6;
+            captchaYear = 1990;
+            $('#captcha-answer').val(captchaDay + '/' + captchaMonth + '/' + captchaYear);
+        }
+        
+        // Render captcha based on type
+        function renderCaptcha() {
+            const container = $('#birthdate-captcha > div');
+            container.empty();
+            
+            const paddedDay = String(captchaDay).padStart(2, '0');
+            const paddedMonth = String(captchaMonth).padStart(2, '0');
+            
+            switch(currentCaptchaType) {
+                case 1: // Day/Month/Year with 3 separate numpads
+                    container.html(`
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <div style="color: #495057; font-size: 14px; width: 100%;">
+                                <p style="margin: 0; line-height: 1.6; width: 100%; font-weight: 500;">Doğum tarixinizi daxil edin (G\u00fcn-Ay-\u0130l):</p>
+                            </div>
+                            <div style="background: #fff; border: 2px solid #ced4da; border-radius: 4px; padding: 8px 15px; display: flex; gap: 5px; align-items: center; flex-shrink: 0;">
+                                <span id="captcha-day-input" style="color: #212529; font-size: 20px; min-width: 30px; text-align: center; font-weight: 600;">--</span>
+                                <span style="color: #adb5bd;">/</span>
+                                <span id="captcha-month-input" style="color: #212529; font-size: 20px; min-width: 30px; text-align: center; font-weight: 600;">--</span>
+                                <span style="color: #adb5bd;">/</span>
+                                <span id="captcha-year-input" style="color: #212529; font-size: 20px; min-width: 50px; text-align: center; font-weight: 600;">----</span>
+                            </div>
+                        </div>
+                        <div style="max-width: 300px;">
+                            <div id="shared-numpad" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px;"></div>
+                        </div>
+                    `);
+                    generateNumPad('#shared-numpad', '#captcha-day-input', 2, 'day');
+                    break;
+                
+                case 2: // DD.MM.YYYY format with dots
+                    container.html(`
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <div style="color: #495057; font-size: 16px; width: 100%;">
+                                <p style="margin: 0; line-height: 1.6; font-weight: 600; color: #212529; width: 100%;">Doğum tarixinizi GG.AA.YYYY formatında daxil edin:</p>
+                            </div>
+                            <div style="background: #fff; border: 2px solid #ced4da; border-radius: 4px; padding: 8px 15px; display: flex; gap: 5px; align-items: center; flex-shrink: 0;">
+                                <span id="captcha-full-input" style="color: #212529; font-size: 20px; min-width: 120px; text-align: center; font-weight: 600;">--.--.----</span>
+                            </div>
+                        </div>
+                        <div style="max-width: 300px;">
+                            <div id="full-numpad" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px;"></div>
+                        </div>
+                    `);
+                    generateNumPad('#full-numpad', '#captcha-full-input', 10, 'full');
+                    break;
+            }
+            
+            // Add error message div
+            container.append('<div id="captcha-error" style="color: #dc3545; font-size: 14px; margin-top: 20px; text-align: center; display: none;"></div>');
+        }
+        
+        // Initialize with user's actual birthdate from restrictions
+        if (typeof midaUserRestrictions !== 'undefined' && midaUserRestrictions.birthdate) {
+            const birthParts = midaUserRestrictions.birthdate.split('-'); // YYYY-MM-DD
+            if (birthParts.length === 3) {
+                captchaYear = parseInt(birthParts[0]);
+                captchaMonth = parseInt(birthParts[1]);
+                captchaDay = parseInt(birthParts[2]);
+                
+                $('#captcha-answer').val(captchaDay + '/' + captchaMonth + '/' + captchaYear);
+            }
+        } else {
+            // Fallback: should not happen if admin configured properly
+            captchaDay = 15;
+            captchaMonth = 6;
+            captchaYear = 1990;
+            $('#captcha-answer').val(captchaDay + '/' + captchaMonth + '/' + captchaYear);
+        }
+        
+        // Select random captcha type and render
+        currentCaptchaType = getRandomCaptchaType();
+        renderCaptcha();
+        
+        // Listen to form changes
+        $('select[autocomplete="off"], input[name="payment-method"]').on('change', validateStep1);
+        
+        // Initial validation check
+        validateStep1();
+        
+        // ============================================
+        // Step 2 Captcha Initialization
+        // ============================================
+        
+        // Variables for step 2 captcha (separate from step 1)
+        let dayInputStep2 = '';
+        let monthInputStep2 = '';
+        let yearInputStep2 = '';
+        let captchaDayStep2 = 10;
+        let captchaMonthStep2 = 1;
+        let captchaYearStep2 = 1985;
+        let currentCaptchaTypeStep2 = 1;
+        
+        // Render captcha for step 2
+        function renderCaptchaStep2() {
+            const container = $('#birthdate-captcha-step2 > div');
+            container.empty();
+            
+            const paddedDay = String(captchaDayStep2).padStart(2, '0');
+            const paddedMonth = String(captchaMonthStep2).padStart(2, '0');
+            
+            switch(currentCaptchaTypeStep2) {
+                case 1: // Day/Month/Year with shared numpad
+                    container.html(`
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <div style="color: #495057; font-size: 13px; width: 100%;">
+                                <p style="margin: 0; line-height: 1.5; width: 100%; font-weight: 500;">Doğum tarixinizi daxil edin:</p>
+                            </div>
+                            <div style="background: #fff; border: 2px solid #ced4da; border-radius: 4px; padding: 6px 12px; display: flex; gap: 5px; align-items: center; flex-shrink: 0;">
+                                <span id="captcha-day-input-step2" style="color: #212529; font-size: 18px; min-width: 25px; text-align: center; font-weight: 600;">--</span>
+                                <span style="color: #adb5bd;">/</span>
+                                <span id="captcha-month-input-step2" style="color: #212529; font-size: 18px; min-width: 25px; text-align: center; font-weight: 600;">--</span>
+                                <span style="color: #adb5bd;">/</span>
+                                <span id="captcha-year-input-step2" style="color: #212529; font-size: 18px; min-width: 45px; text-align: center; font-weight: 600;">----</span>
+                            </div>
+                        </div>
+                        <div style="max-width: 250px;">
+                            <div id="shared-numpad-step2" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;"></div>
+                        </div>
+                    `);
+                    generateNumPad('#shared-numpad-step2', '#captcha-day-input-step2', 2, 'day');
+                    break;
+                
+                case 2: // DD.MM.YYYY format with dots
+                    container.html(`
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <div style="color: #495057; font-size: 13px; width: 100%;">
+                                <p style="margin: 0; line-height: 1.5; font-weight: 600; color: #212529; width: 100%;">Doğum tarixinizi daxil edin:</p>
+                            </div>
+                            <div style="background: #fff; border: 2px solid #ced4da; border-radius: 4px; padding: 6px 12px; display: flex; gap: 5px; align-items: center; flex-shrink: 0;">
+                                <span id="captcha-full-input-step2" style="color: #212529; font-size: 18px; min-width: 100px; text-align: center; font-weight: 600;">--.--.----</span>
+                            </div>
+                        </div>
+                        <div style="max-width: 250px;">
+                            <div id="full-numpad-step2" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;"></div>
+                        </div>
+                    `);
+                    generateNumPad('#full-numpad-step2', '#captcha-full-input-step2', 10, 'full');
+                    break;
+            }
+            
+            // Add error message div
+            container.append('<div id="captcha-error-step2" style="color: #dc3545; font-size: 12px; margin-top: 15px; text-align: center; display: none;"></div>');
+        }
+        
+        // Initialize step 2 captcha with user's birthdate
+        if (typeof midaUserRestrictions !== 'undefined' && midaUserRestrictions.birthdate) {
+            const birthParts = midaUserRestrictions.birthdate.split('-');
+            if (birthParts.length === 3) {
+                captchaYearStep2 = parseInt(birthParts[0]);
+                captchaMonthStep2 = parseInt(birthParts[1]);
+                captchaDayStep2 = parseInt(birthParts[2]);
+                
+                $('#captcha-answer-step2').val(captchaDayStep2 + '/' + captchaMonthStep2 + '/' + captchaYearStep2);
+            }
+        }
+        
+        // Select random captcha type and render for step 2
+        currentCaptchaTypeStep2 = getRandomCaptchaType();
+        renderCaptchaStep2();
+        
+        // Validate captcha for step 2
+        window.validateCaptchaStep2 = function() {
+            let userAnswer = '';
+            const paddedDay = String(captchaDayStep2).padStart(2, '0');
+            const paddedMonth = String(captchaMonthStep2).padStart(2, '0');
+            const correctAnswer = paddedDay + paddedMonth + captchaYearStep2;
+            
+            switch(currentCaptchaTypeStep2) {
+                case 1: // Day/Month/Year
+                    const enteredDay = (window.dayInputStep2 || '').padStart(2, '0');
+                    const enteredMonth = (window.monthInputStep2 || '').padStart(2, '0');
+                    const enteredYear = window.yearInputStep2 || '';
+                    
+                    if (!window.dayInputStep2 || !window.monthInputStep2 || !window.yearInputStep2) {
+                        $('#captcha-error-step2').css('color', '#dc3545').text('Bütün sahələri doldurun!').show();
+                        return;
+                    }
+                    
+                    userAnswer = enteredDay + enteredMonth + enteredYear;
+                    break;
+                    
+                case 2: // DD.MM.YYYY format
+                    userAnswer = $('#captcha-full-input-step2').text().replace(/\./g, '').replace(/-/g, '').trim();
+                    
+                    if (!userAnswer || userAnswer.length !== 8) {
+                        $('#captcha-error-step2').css('color', '#dc3545').text('Tam tarixi daxil edin!').show();
+                        return;
+                    }
+                    break;
+            }
+            
+            const isCorrect = (userAnswer === correctAnswer);
+            
+            if (isCorrect) {
+                console.log('=== Step 2 Captcha Success ===');
+                $('#captcha-verified-step2').val('1');
+                $('#captcha-error-step2').text('').hide();
+                $('#birthdate-captcha-step2').css({
+                    'border': '2px solid #28a745',
+                    'background': '#d4edda'
+                });
+                
+                $('#captcha-error-step2').css('color', '#28a745').text('✓ Təsdiqləndi!').show();
+                
+                // Update search button state
+                if (typeof updateSearchButtonState === 'function') {
+                    updateSearchButtonState();
+                }
+            } else {
+                console.log('=== Step 2 Captcha Failed ===');
+                $('#captcha-verified-step2').val('0');
+                $('#captcha-error-step2').css('color', '#dc3545').text('Yanlış cavab!').show();
+                
+                // Reset inputs
+                window.dayInputStep2 = '';
+                window.monthInputStep2 = '';
+                window.yearInputStep2 = '';
+                $('#captcha-day-input-step2').text('--');
+                $('#captcha-month-input-step2').text('--');
+                $('#captcha-year-input-step2').text('----');
+                $('#captcha-full-input-step2').text('--.--.----');
+                
+                $('#birthdate-captcha-step2').css({
+                    'border': '2px solid #dc3545',
+                    'background': '#f8d7da'
+                });
+                
+                // Update search button state (disable it)
+                if (typeof updateSearchButtonState === 'function') {
+                    updateSearchButtonState();
+                }
+            }
+        };
     });
 
 })(jQuery);
