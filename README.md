@@ -1,6 +1,6 @@
 # Mida WordPress Plugin
 
-**Version:** 1.4.0  
+**Version:** 1.4.1  
 **Author:** difteriya  
 **Website:** [xudiyev.com](https://xudiyev.com)  
 **Description:** MIDA oyunu üçün lazım olan hər şey
@@ -229,6 +229,10 @@ Mida/
 ## 🔄 Version History
 
 ## 🔄 Version History
+
+### 1.4.1 (2025-11-30)
+- 🐛 **FIX:** Reset numpad input type to 'day' after wrong captcha answer
+- 🐛 **FIX:** Prevented typing from starting at 'year' field after validation failure
 
 ### 1.4.0 (2025-11-30)
 - ✅ **NEW:** Dual birthdate captcha system with 2 random types

@@ -3,7 +3,7 @@
  * Plugin Name: Mida
  * Plugin URI: https://xudiyev.com
  * Description: MIDA oyunu üçün lazım olan hər şey
- * Version: 1.4.0
+ * Version: 1.4.1
  * Author: difteriya
  * Author URI: https://xudiyev.com
  * License: GPL v2 or later
@@ -18,7 +18,7 @@ if (!defined('WPINC')) {
 }
 
 // Define plugin constants
-define('MIDA_VERSION', '1.4.0');
+define('MIDA_VERSION', '1.4.1');
 define('MIDA_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('MIDA_PLUGIN_URL', plugin_dir_url(__FILE__));
 
