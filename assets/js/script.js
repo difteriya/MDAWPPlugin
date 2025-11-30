@@ -1152,6 +1152,13 @@
                 $('#captcha-year-input').text('----');
                 $('#captcha-full-input').text('--.--.----');
                 
+                // Reset numpad input type back to 'day' for type 1 captcha
+                if (currentCaptchaType === 1) {
+                    $('#shared-numpad').find('.numpad-btn').data('input-type', 'day');
+                    $('#shared-numpad').find('[id$="-clear"]').data('input-type', 'day');
+                    $('#shared-numpad').find('[id$="-backspace"]').data('input-type', 'day');
+                }
+                
                 $('#birthdate-captcha').css({
                     'border': '2px solid #dc3545',
                     'background': '#f8d7da'
@@ -1399,6 +1406,13 @@
                 $('#captcha-month-input-step2').text('--');
                 $('#captcha-year-input-step2').text('----');
                 $('#captcha-full-input-step2').text('--.--.----');
+                
+                // Reset numpad input type back to 'day' for type 1 captcha
+                if (currentCaptchaTypeStep2 === 1) {
+                    $('#shared-numpad-step2').find('.numpad-btn').data('input-type', 'day');
+                    $('#shared-numpad-step2').find('[id$="-clear"]').data('input-type', 'day');
+                    $('#shared-numpad-step2').find('[id$="-backspace"]').data('input-type', 'day');
+                }
                 
                 $('#birthdate-captcha-step2').css({
                     'border': '2px solid #dc3545',
